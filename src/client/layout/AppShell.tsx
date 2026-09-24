@@ -4,7 +4,7 @@ import { PrimaryNav } from './PrimaryNav';
 
 export function AppShell() {
   return (
-    <div className="min-h-screen" style={{ background: '#09090B' }}>
+    <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #0f172a 0%, #111827 100%)' }}>
       {/* Skip to main content for keyboard / screen-reader users (WCAG 2.2 AA) */}
       <a
         href="#main-content"

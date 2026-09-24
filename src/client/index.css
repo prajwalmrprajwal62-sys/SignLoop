@@ -4,69 +4,70 @@
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    /* === LIGHTER THEME — slate-based, not pitch black === */
+    --background: 222 47% 8%;        /* #0f172a — dark navy blue, not pure black */
+    --foreground: 210 40% 96%;       /* #f1f5f9 */
 
-    --card: 240 10% 4.5%;
-    --card-foreground: 0 0% 98%;
+    --card: 222 47% 10%;             /* #111827 */
+    --card-foreground: 210 40% 96%;
 
-    --popover: 240 10% 4.5%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 96%;
 
-    --primary: 186 100% 42%;          /* Teal #2DE2E6 */
-    --primary-foreground: 240 10% 3.9%;
+    --primary: 186 100% 42%;         /* Teal #2DE2E6 */
+    --primary-foreground: 222 47% 8%;
 
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 217 32% 17%;        /* Slate-700 */
+    --secondary-foreground: 210 40% 96%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted: 217 32% 17%;
+    --muted-foreground: 215 20% 60%;
 
     --accent: 263 70% 50%;           /* Violet #7C3AED */
     --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
+    --border: 217 32% 20%;
+    --input: 217 32% 17%;
     --ring: 186 100% 42%;
 
     --radius: 0.75rem;
 
-    /* Base Surfaces */
-    --sl-bg-root: #09090B;
-    --sl-bg-panel: #111116;
-    --sl-bg-glass: rgba(17, 17, 22, 0.75);
-    --sl-bg-elevated: #18181F;
-    --sl-bg-input: #1C1C26;
+    /* Base Surfaces — slate-based, not zinc-based */
+    --sl-bg-root: #0f172a;
+    --sl-bg-panel: #1e293b;
+    --sl-bg-glass: rgba(30, 41, 59, 0.85);
+    --sl-bg-elevated: #243047;
+    --sl-bg-input: #1e293b;
 
-    /* Borders */
-    --sl-border-1: rgba(255, 255, 255, 0.04);
-    --sl-border-2: rgba(255, 255, 255, 0.08);
-    --sl-border-3: rgba(255, 255, 255, 0.14);
+    /* Borders — more visible */
+    --sl-border-1: rgba(255, 255, 255, 0.06);
+    --sl-border-2: rgba(255, 255, 255, 0.10);
+    --sl-border-3: rgba(255, 255, 255, 0.18);
 
     /* Role Gradients */
-    --mesh-student: linear-gradient(135deg, #1E1060 0%, #0D2060 40%, #0A1A40 100%);
-    --mesh-teacher: linear-gradient(135deg, #2D1060 0%, #1A0A50 40%, #0A1040 100%);
-    --mesh-comms: linear-gradient(135deg, #0A2040 0%, #0A1860 40%, #001230 100%);
-    --mesh-live: linear-gradient(135deg, #0A2030 0%, #001A40 50%, #001830 100%);
-    --mesh-evidence: linear-gradient(135deg, #1A1040 0%, #0D1850 50%, #0A0A30 100%);
+    --mesh-student: linear-gradient(135deg, #1e3a5f 0%, #1e2d5a 40%, #172447 100%);
+    --mesh-teacher: linear-gradient(135deg, #2d1f5f 0%, #221550 40%, #16104a 100%);
+    --mesh-comms:   linear-gradient(135deg, #1a2f5f 0%, #152655 40%, #101f4a 100%);
+    --mesh-live:    linear-gradient(135deg, #0f2540 0%, #12284f 50%, #0d2040 100%);
+    --mesh-evidence:linear-gradient(135deg, #1e1f50 0%, #181d4a 50%, #121540 100%);
 
     /* Role Accents */
     --accent-student: #2DE2E6;
     --accent-teacher: #7C3AED;
     --accent-comms: #A855F7;
-    --accent-glow-student: rgba(45, 226, 230, 0.12);
-    --accent-glow-teacher: rgba(124, 58, 237, 0.12);
-    --accent-glow-comms: rgba(168, 85, 247, 0.12);
+    --accent-glow-student: rgba(45, 226, 230, 0.15);
+    --accent-glow-teacher: rgba(124, 58, 237, 0.15);
+    --accent-glow-comms: rgba(168, 85, 247, 0.15);
 
     /* Canonical Status Colors */
     --s-pass: #10B981;
     --s-review: #F59E0B;
     --s-fail: #EF4444;
     --s-info: #3B82F6;
-    --s-muted: #52525B;
+    --s-muted: #64748B;
     --s-abstain: #8B5CF6;
     --s-audio: #06B6D4;
   }
@@ -75,66 +76,49 @@
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background: #0f172a;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  /* Custom Workstation Scrollbars */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: #09090B;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #27272A;
-    border-radius: 3px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #3F3F46;
-  }
+  /* Custom scrollbars — slate-based */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #0f172a; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #475569; }
 }
 
 @layer components {
-  /* Exact Spec Glassmorphism Panel */
+  /* Glassmorphism Panel — lighter */
   .glass-panel {
-    background: rgba(17, 17, 22, 0.75);
+    background: rgba(30, 41, 59, 0.8);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.10);
     border-radius: 16px;
   }
 
   /* Gradient Mesh Background Classes */
-  .bg-mesh-student {
-    background-image: var(--mesh-student);
-  }
-  .bg-mesh-teacher {
-    background-image: var(--mesh-teacher);
-  }
-  .bg-mesh-comms {
-    background-image: var(--mesh-comms);
-  }
-  .bg-mesh-live {
-    background-image: var(--mesh-live);
-  }
-  .bg-mesh-evidence {
-    background-image: var(--mesh-evidence);
-  }
+  .bg-mesh-student  { background-image: var(--mesh-student); }
+  .bg-mesh-teacher  { background-image: var(--mesh-teacher); }
+  .bg-mesh-comms    { background-image: var(--mesh-comms); }
+  .bg-mesh-live     { background-image: var(--mesh-live); }
+  .bg-mesh-evidence { background-image: var(--mesh-evidence); }
 
   /* Keyboard Navigation Focus Ring (WCAG 2.2 AA) */
   .focus-ring {
-    @apply outline-none ring-2 ring-teal-400 ring-offset-2 ring-offset-zinc-950;
+    @apply outline-none ring-2 ring-teal-400 ring-offset-2 ring-offset-slate-900;
   }
 }
 
 /* Accessibility: Respect prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
+  *, ::before, ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

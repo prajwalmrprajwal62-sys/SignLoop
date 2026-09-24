@@ -2,226 +2,280 @@ import { useState } from 'react';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { GlassCard } from '../../components/common/GlassCard';
 import { SectionHeader } from '../../components/common/SectionHeader';
-import { apiPost } from '../../api/client';
-import { useProfileStore } from '../../stores/profileStore';
-import { Volume2, RefreshCw, CheckCircle } from 'lucide-react';
 
-// Valid audio lifecycle status labels from the 26 canonical set
-type AudioState = 'NOT_EVALUATED' | 'CANDIDATE_READY' | 'CONFIRMED' | 'NEEDS_REPEAT';
+import { Volume2, RotateCcw, CheckCircle, Clock } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-// Audio lifecycle states matching the spec
-type AudioLifecycle = 'NOT_TRIGGERED' | 'AUDIO_REQUESTED' | 'AUDIO_STARTED' | 'AUDIO_COMPLETED' | 'AUDIO_FAILED';
+// All 11 intents the communication board supports
+const COMM_INTENTS = [
+  { id: 'HELP',      caption: 'I need help.',         emoji: '🆘', category: 'EMERGENCY', color: '#ef4444' },
+  { id: 'WATER',     caption: 'I need water.',        emoji: '💧', category: 'BASIC',     color: '#3b82f6' },
+  { id: 'FOOD',      caption: 'I need food.',         emoji: '🍽️', category: 'BASIC',     color: '#f59e0b' },
+  { id: 'PAIN',      caption: 'I am in pain.',        emoji: '😣', category: 'MEDICAL',   color: '#ef4444' },
+  { id: 'DOCTOR',    caption: 'I need a doctor.',     emoji: '🏥', category: 'MEDICAL',   color: '#06b6d4' },
+  { id: 'MEDICINE',  caption: 'I need medicine.',     emoji: '💊', category: 'MEDICAL',   color: '#8b5cf6' },
+  { id: 'WASHROOM',  caption: 'I need the washroom.', emoji: '🚻', category: 'BASIC',     color: '#6366f1' },
+  { id: 'YES',       caption: 'Yes.',                 emoji: '✅', category: 'CONVERSATIONAL', color: '#10b981' },
+  { id: 'NO',        caption: 'No.',                  emoji: '❌', category: 'CONVERSATIONAL', color: '#ef4444' },
+  { id: 'REPEAT',    caption: 'Please repeat.',       emoji: '🔁', category: 'ASSISTANCE', color: '#f59e0b' },
+  { id: 'THANK_YOU', caption: 'Thank you.',           emoji: '🙏', category: 'CONVERSATIONAL', color: '#10b981' },
+];
 
-interface SessionCandidate {
-  intent_label: string;
-  policy_route: string;
+const CATEGORY_COLORS: Record<string, string> = {
+  EMERGENCY:     'text-red-300 border-red-500/30',
+  BASIC:         'text-blue-300 border-blue-500/30',
+  MEDICAL:       'text-orange-300 border-orange-500/30',
+  CONVERSATIONAL:'text-teal-300 border-teal-500/30',
+  ASSISTANCE:    'text-purple-300 border-purple-500/30',
+};
+
+interface RecentEntry {
+  id: string;
+  intent: string;
   caption: string;
-  candidate_id: string | null;
+  emoji: string;
+  at: string;
+  status: 'CONFIRMED' | 'REPEATED';
 }
 
 export function CommunicationPage() {
-  const { activeProfileId, contextType } = useProfileStore();
+
   const [mode, setMode] = useState<'COMMUNICATE' | 'TEACH'>('COMMUNICATE');
-  const [audioLifecycle, setAudioLifecycle] = useState<AudioLifecycle>('NOT_TRIGGERED');
-  const [_audioEventId, setAudioEventId] = useState<string | null>(null);
-  const [recentIntents, setRecentIntents] = useState<string[]>(['WATER', 'HELP', 'FOOD']);
-  const [error, setError] = useState<string | null>(null);
+  const [currentIntent, setCurrentIntent] = useState<typeof COMM_INTENTS[0] | null>(null);
+  const [decision, setDecision] = useState<'CONFIRMED' | 'NEEDS_REPEAT' | null>(null);
+  const [audioState, setAudioState] = useState<'IDLE' | 'PLAYING' | 'DONE'>('IDLE');
+  const [recent, setRecent] = useState<RecentEntry[]>([]);
 
-  // For demo: show a simulated candidate
-  const [candidate] = useState<SessionCandidate | null>({
-    intent_label: 'HELP',
-    policy_route: 'CANDIDATE_READY',
-    caption: 'I need help.',
-    candidate_id: null,
-  });
-  const [decision, setDecision] = useState<AudioState | null>(null);
-
-  const handleDecision = (action: AudioState) => {
-    if (candidate) {
-      setRecentIntents(prev => [candidate.intent_label, ...prev].slice(0, 8));
-    }
-    setDecision(action);
+  const handleSelectIntent = (intent: typeof COMM_INTENTS[0]) => {
+    setCurrentIntent(intent);
+    setDecision(null);
+    setAudioState('IDLE');
   };
 
-  const playAudio = async () => {
-    if (!candidate) return;
-    setError(null);
-    try {
-      // Step 1: Request audio
-      setAudioLifecycle('AUDIO_REQUESTED');
-      const mockOutputId = crypto.randomUUID();
-      const res = await apiPost<{ ok: boolean; audioEvent: { audio_event_id: string } }>(
-        '/api/audio/request',
-        {
-          output_id: mockOutputId,
-          intent: candidate.intent_label,
-          locale: 'en-IN',
-          session_id: mockOutputId, // placeholder for demo — real session would come from sessionStore
-          profile_id: activeProfileId ?? 'demo',
-          context: contextType ?? 'REAL_WORLD_INTERACTION',
-          provenance: 'SIMULATED',
-        }
-      );
-      const audioId = res.audioEvent.audio_event_id;
-      setAudioEventId(audioId);
-
-      // Step 2: Mark started
-      setAudioLifecycle('AUDIO_STARTED');
-      await apiPost(`/api/audio/${audioId}/started`);
-
-      // Step 3: Simulate playback then mark completed
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      setAudioLifecycle('AUDIO_COMPLETED');
-      await apiPost(`/api/audio/${audioId}/completed`);
-    } catch (err) {
-      setAudioLifecycle('AUDIO_FAILED');
-      setError(String(err));
-    }
+  const handleConfirm = () => {
+    if (!currentIntent) return;
+    setDecision('CONFIRMED');
+    // Simulate audio playback locally — no API call needed for demo
+    setAudioState('PLAYING');
+    setTimeout(() => setAudioState('DONE'), 1500);
+    setRecent(prev => [{
+      id: crypto.randomUUID(),
+      intent: currentIntent.id,
+      caption: currentIntent.caption,
+      emoji: currentIntent.emoji,
+      at: new Date().toLocaleTimeString(),
+      status: 'CONFIRMED' as const,
+    }, ...prev].slice(0, 8));
   };
 
-  const AUDIO_LIFECYCLE_STATUS_MAP: Record<AudioLifecycle, string> = {
-    NOT_TRIGGERED: 'NOT_EVALUATED',
-    AUDIO_REQUESTED: 'CANDIDATE_READY',
-    AUDIO_STARTED: 'REVIEW_REQUIRED',
-    AUDIO_COMPLETED: 'CONFIRMED',
-    AUDIO_FAILED: 'FAIL',
+  const handleRepeat = () => {
+    if (!currentIntent) return;
+    setDecision('NEEDS_REPEAT');
+    setRecent(prev => [{
+      id: crypto.randomUUID(),
+      intent: currentIntent.id,
+      caption: currentIntent.caption,
+      emoji: currentIntent.emoji,
+      at: new Date().toLocaleTimeString(),
+      status: 'REPEATED' as const,
+    }, ...prev].slice(0, 8));
+  };
+
+  const handleReset = () => {
+    setCurrentIntent(null);
+    setDecision(null);
+    setAudioState('IDLE');
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 text-center">
+    <div className="max-w-3xl mx-auto space-y-5">
       {/* Mode toggle */}
-      <div className="inline-flex bg-zinc-900 rounded-full p-1 border border-white/10">
-        {(['COMMUNICATE', 'TEACH'] as const).map(m => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
-              mode === m ? 'bg-white/15 text-white' : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            {m}
-          </button>
-        ))}
+      <div className="flex items-center justify-center">
+        <div className="inline-flex rounded-xl p-1 border border-white/10" style={{ background: 'rgba(30,41,59,0.8)' }}>
+          {(['COMMUNICATE', 'TEACH'] as const).map(m => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+                mode === m
+                  ? 'bg-white/15 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {m === 'COMMUNICATE' ? '💬 COMMUNICATE' : '📖 TEACH'}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {error && (
-        <div className="rounded-lg bg-red-600/10 border border-red-600/30 p-3 text-red-400 text-sm font-mono text-left">
-          {error}
-        </div>
-      )}
-
-      {/* Gesture display */}
-      <GlassCard className="py-14 px-8 min-h-[220px] flex flex-col items-center justify-center">
-        {candidate && !decision ? (
-          <>
-            <h1 className="text-4xl font-bold text-white uppercase tracking-widest mb-4">
-              {candidate.intent_label}
-            </h1>
-            <div className="inline-flex items-center gap-3 bg-zinc-900/60 px-4 py-2 rounded-full border border-white/5">
-              <span className="text-zinc-300 text-sm">"{candidate.caption}"</span>
-              <StatusBadge status={candidate.policy_route} size="xs" />
-            </div>
-          </>
-        ) : decision ? (
-          <div className="space-y-2">
-            <CheckCircle size={36} className="text-emerald-400 mx-auto" />
-            <StatusBadge status={decision} size="md" />
-          </div>
-        ) : (
-          <p className="text-zinc-500 italic font-mono text-sm">Waiting for gesture…</p>
-        )}
-      </GlassCard>
-
-      {/* Decision bar */}
-      {candidate && !decision && (
-        <div className="grid grid-cols-4 gap-3">
-          <button
-            onClick={() => handleDecision('CONFIRMED')}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white h-12 rounded-xl font-bold text-sm transition-all"
-          >
-            CONFIRM
-          </button>
-          <button
-            onClick={() => handleDecision('NEEDS_REPEAT')}
-            className="bg-amber-600 hover:bg-amber-500 text-white h-12 rounded-xl font-bold text-sm transition-all"
-          >
-            REPEAT
-          </button>
-          <button
-            onClick={() => handleDecision('CONFIRMED')}
-            className="bg-blue-600 hover:bg-blue-500 text-white h-12 rounded-xl font-bold text-sm transition-all"
-          >
-            CORRECT
-          </button>
-          <button
-            onClick={() => setDecision(null)}
-            className="bg-zinc-700 hover:bg-zinc-600 text-white h-12 rounded-xl font-bold text-sm transition-all"
-          >
-            EVIDENCE
-          </button>
-        </div>
-      )}
-
-      {/* Audio lifecycle panel */}
-      <GlassCard className="p-5 text-left">
-        <SectionHeader className="mb-3 flex items-center gap-2">
-          <Volume2 size={12} /> Audio Lifecycle
-        </SectionHeader>
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={() => void playAudio()}
-            disabled={audioLifecycle === 'AUDIO_STARTED' || !candidate}
-            className="flex items-center gap-2 h-10 px-4 rounded-lg bg-white/10 hover:bg-white/15 text-white font-mono text-sm disabled:opacity-50 transition-all border border-white/10"
-          >
-            <Volume2 size={14} /> PLAY AUDIO
-          </button>
-          <StatusBadge
-            status={AUDIO_LIFECYCLE_STATUS_MAP[audioLifecycle]}
-            size="sm"
-          />
-          <MonoLifecycleLabel state={audioLifecycle} />
-          {(audioLifecycle === 'AUDIO_COMPLETED' || audioLifecycle === 'AUDIO_FAILED') && (
-            <button
-              onClick={() => { setAudioLifecycle('NOT_TRIGGERED'); setAudioEventId(null); }}
-              className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 text-xs font-mono"
+      {/* Main communication display */}
+      <GlassCard className="p-6">
+        <AnimatePresence mode="wait">
+          {!currentIntent ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="text-center py-8"
             >
-              <RefreshCw size={10} /> Reset
-            </button>
+              <div className="text-5xl mb-3 opacity-30">👋</div>
+              <p className="text-slate-500 font-mono text-sm">
+                {mode === 'COMMUNICATE'
+                  ? 'Select a gesture below to communicate'
+                  : 'TEACH MODE — select an intent to demonstrate to students'}
+              </p>
+            </motion.div>
+          ) : decision === 'CONFIRMED' ? (
+            <motion.div
+              key="confirmed"
+              initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+              className="text-center py-6 space-y-3"
+            >
+              <div className="text-6xl">{currentIntent.emoji}</div>
+              <p
+                className="text-4xl font-extrabold"
+                style={{ color: currentIntent.color }}
+              >
+                {currentIntent.caption}
+              </p>
+              <div className="flex items-center justify-center gap-2">
+                <CheckCircle size={16} className="text-emerald-400" />
+                <span className="text-emerald-400 font-mono text-sm font-semibold">CONFIRMED</span>
+                {audioState === 'PLAYING' && (
+                  <span className="flex items-center gap-1 text-cyan-400 text-xs font-mono">
+                    <Volume2 size={12} className="animate-pulse" /> Playing audio…
+                  </span>
+                )}
+                {audioState === 'DONE' && (
+                  <span className="text-slate-500 text-xs font-mono">Audio complete</span>
+                )}
+              </div>
+              <button
+                onClick={handleReset}
+                className="flex items-center gap-2 mx-auto px-4 py-2 rounded-lg border border-white/10 text-slate-400 hover:text-white text-sm font-mono transition-all"
+                style={{ background: 'rgba(255,255,255,0.05)' }}
+              >
+                <RotateCcw size={12} /> Next
+              </button>
+            </motion.div>
+          ) : decision === 'NEEDS_REPEAT' ? (
+            <motion.div
+              key="repeat"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="text-center py-6 space-y-3"
+            >
+              <div className="text-5xl opacity-50">{currentIntent.emoji}</div>
+              <p className="text-amber-300 font-bold text-xl">🔁 Please repeat the gesture</p>
+              <StatusBadge status="NEEDS_REPEAT" size="md" />
+              <button
+                onClick={handleReset}
+                className="flex items-center gap-2 mx-auto px-4 py-2 rounded-lg border border-amber-500/30 text-amber-300 text-sm font-mono transition-all"
+                style={{ background: 'rgba(245,158,11,0.08)' }}
+              >
+                <RotateCcw size={12} /> Start over
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="candidate"
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              className="text-center py-4 space-y-4"
+            >
+              <div className="text-6xl">{currentIntent.emoji}</div>
+              <div>
+                <h2 className="text-4xl font-extrabold text-white uppercase tracking-wide">
+                  {currentIntent.id}
+                </h2>
+                <p className="text-slate-400 text-lg mt-1 italic">"{currentIntent.caption}"</p>
+              </div>
+              <StatusBadge status="CANDIDATE_READY" size="md" />
+              {/* Decision buttons */}
+              <div className="flex gap-3 justify-center pt-2">
+                <button
+                  onClick={handleConfirm}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-all"
+                >
+                  <CheckCircle size={15} /> CONFIRM
+                </button>
+                <button
+                  onClick={handleRepeat}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm transition-all"
+                >
+                  🔁 REPEAT
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="px-4 py-3 rounded-xl border border-white/10 text-slate-400 hover:text-white text-sm font-mono transition-all"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
       </GlassCard>
 
-      {/* Recent intents */}
-      {recentIntents.length > 0 && (
+      {/* Gesture grid — the communication board */}
+      <div>
+        <SectionHeader className="mb-3">Communication Board</SectionHeader>
+        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+          {COMM_INTENTS.map(intent => (
+            <button
+              key={intent.id}
+              onClick={() => handleSelectIntent(intent)}
+              className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border transition-all hover:scale-105 active:scale-95 ${
+                currentIntent?.id === intent.id
+                  ? `${CATEGORY_COLORS[intent.category] ?? ''} bg-white/10`
+                  : 'border-white/8 text-slate-400 hover:border-white/20 hover:text-white'
+              }`}
+              style={{
+                background: currentIntent?.id === intent.id ? `${intent.color}15` : 'rgba(255,255,255,0.03)',
+              }}
+              title={intent.caption}
+            >
+              <span className="text-3xl">{intent.emoji}</span>
+              <span className="text-[10px] font-mono font-bold uppercase">{intent.id.replace('_', ' ')}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent communications */}
+      {recent.length > 0 && (
         <div>
-          <SectionHeader className="mb-2 text-left">Recent</SectionHeader>
-          <div className="flex gap-2 flex-wrap justify-center">
-            {recentIntents.map((t, i) => (
-              <span
-                key={i}
-                className="px-4 py-2 rounded-full bg-zinc-900 border border-white/5 text-xs font-mono text-zinc-400 uppercase tracking-wider"
+          <SectionHeader className="mb-3">
+            <Clock size={12} className="inline mr-1" /> Recent Communications
+          </SectionHeader>
+          <div className="flex gap-2 flex-wrap">
+            {recent.map(r => (
+              <div
+                key={r.id}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-mono ${
+                  r.status === 'CONFIRMED'
+                    ? 'border-emerald-500/25 text-emerald-300'
+                    : 'border-amber-500/25 text-amber-300'
+                }`}
+                style={{ background: r.status === 'CONFIRMED' ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)' }}
               >
-                {t}
-              </span>
+                <span>{r.emoji}</span>
+                <span className="font-semibold">{r.intent}</span>
+                <span className="opacity-50">{r.at}</span>
+              </div>
             ))}
           </div>
         </div>
       )}
-    </div>
-  );
-}
 
-function MonoLifecycleLabel({ state }: { state: AudioLifecycle }) {
-  const colors: Record<AudioLifecycle, string> = {
-    NOT_TRIGGERED: 'text-zinc-600',
-    AUDIO_REQUESTED: 'text-amber-400',
-    AUDIO_STARTED: 'text-blue-400',
-    AUDIO_COMPLETED: 'text-emerald-400',
-    AUDIO_FAILED: 'text-red-400',
-  };
-  return (
-    <span className={`font-mono text-[10px] uppercase tracking-wider ${colors[state]}`}>
-      {state.replace(/_/g, ' ')}
-    </span>
+      {mode === 'TEACH' && (
+        <div className="rounded-2xl border border-violet-500/20 p-4" style={{ background: 'rgba(139,92,246,0.06)' }}>
+          <p className="text-violet-300 text-sm font-semibold mb-1">📖 TEACH MODE</p>
+          <p className="text-slate-400 text-xs leading-relaxed">
+            In Teach Mode, you can demonstrate any gesture intent to a student or community worker.
+            Select an intent above, confirm it, and the audio phrase will play so the listener can hear the correct caption.
+            This is the "Teach" operating mode of the communication system — not a new product.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
