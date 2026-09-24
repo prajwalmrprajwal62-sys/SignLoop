@@ -1,0 +1,50 @@
+# === Dependencies ===
+node_modules/
+
+# === Build output ===
+dist/
+*.tsbuildinfo
+
+# === SQLite databases (generated at runtime) ===
+data/*.db
+data/*.db-wal
+data/*.db-shm
+*.db
+*.db-wal
+*.db-shm
+
+# === Temp / scratch ===
+.tmp/
+*.tmp
+
+# === Environment ===
+.env
+.env.*
+!.env.example
+
+# === OS junk ===
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# === Editor / IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === Logs ===
+*.log
+npm-debug.log*
+
+# === Python scripts (build helpers, not part of app) ===
+*.pyc
+__pycache__/
+build_pages.py
+fix_main.py
+fix_ts.py
+
+# === Coverage / test artifacts ===
+coverage/
+.nyc_output/

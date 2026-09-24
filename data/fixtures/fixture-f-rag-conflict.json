@@ -1,0 +1,1 @@
+{"fixture_id": "fixture-f-rag-conflict", "label": "F: RAG Conflict", "description": "Conflicting teacher notes. Status: SOURCES_CONFLICT.", "rag_query_type": "WHY_TASK", "expected_tutor_status": "SOURCES_CONFLICT", "quality_pass": true, "provenance": "REPLAY"}

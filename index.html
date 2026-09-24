@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#09090B" />
+    <meta
+      name="description"
+      content="SignLoop — Evidence-Grounded Gesture Training & Communication Workstation"
+    />
+    <title>SignLoop — Gesture Training & Communication</title>
+
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* Flash of Unstyled Content (FOUC) prevention: set root dark background immediately */
+      html, body {
+        background-color: #09090B;
+        color: #FAFAFA;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+      }
+    </style>
+  </head>
+  <body class="bg-sl-root text-zinc-100 font-sans antialiased selection:bg-teal-500/20 selection:text-teal-300">
+    <div id="root"></div>
+    <script type="module" src="/src/client/main.tsx"></script>
+  </body>
+</html>

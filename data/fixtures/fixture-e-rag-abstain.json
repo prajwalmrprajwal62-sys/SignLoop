@@ -1,0 +1,1 @@
+{"fixture_id": "fixture-e-rag-abstain", "label": "E: RAG Abstain", "description": "No matching sources. Status: INSUFFICIENT_EVIDENCE.", "rag_query_type": "ASK_TEACHER", "expected_tutor_status": "INSUFFICIENT_EVIDENCE", "quality_pass": true, "provenance": "REPLAY"}

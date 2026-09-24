@@ -1,0 +1,175 @@
+{
+  "registryVersion": "1.0.0",
+  "defaultLocale": "en-IN",
+  "totalIntents": 12,
+  "entries": [
+    {
+      "intent": "HELP",
+      "phraseKey": "phrase.help",
+      "caption": "I need help.",
+      "captions": {
+        "en-IN": "I need help.",
+        "en-US": "I need help."
+      },
+      "audioAssetId": "audio-help-01",
+      "audioAsset": "audio/en-IN/help.mp3",
+      "category": "EMERGENCY",
+      "displayCategory": "EMERGENCY",
+      "description": "Urgent request for assistance. Closed fist with thumb extended upward resting on open palm of non-dominant hand, lifting slightly together."
+    },
+    {
+      "intent": "WATER",
+      "phraseKey": "phrase.water",
+      "caption": "I need water.",
+      "captions": {
+        "en-IN": "I need water.",
+        "en-US": "I need water."
+      },
+      "audioAssetId": "audio-water-01",
+      "audioAsset": "audio/en-IN/water.mp3",
+      "category": "BASIC_NEEDS",
+      "displayCategory": "BASIC_NEEDS",
+      "description": "Request for drinking water. Three fingers (index, middle, ring) held upright in 'W' shape tapped near mouth or chin."
+    },
+    {
+      "intent": "FOOD",
+      "phraseKey": "phrase.food",
+      "caption": "I need food.",
+      "captions": {
+        "en-IN": "I need food.",
+        "en-US": "I need food."
+      },
+      "audioAssetId": "audio-food-01",
+      "audioAsset": "audio/en-IN/food.mp3",
+      "category": "BASIC_NEEDS",
+      "displayCategory": "BASIC_NEEDS",
+      "description": "Request for meal or food nourishment. Flattened O-handshape with fingertips brought toward lips or mouth repeatedly."
+    },
+    {
+      "intent": "PAIN",
+      "phraseKey": "phrase.pain",
+      "caption": "I am in pain.",
+      "captions": {
+        "en-IN": "I am in pain.",
+        "en-US": "I am in pain."
+      },
+      "audioAssetId": "audio-pain-01",
+      "audioAsset": "audio/en-IN/pain.mp3",
+      "category": "MEDICAL",
+      "displayCategory": "MEDICAL",
+      "description": "Indication of physical distress or localized pain. Index fingers pointed toward each other and twisted or jabbed slightly near area of discomfort."
+    },
+    {
+      "intent": "DOCTOR",
+      "phraseKey": "phrase.doctor",
+      "caption": "I need a doctor.",
+      "captions": {
+        "en-IN": "I need a doctor.",
+        "en-US": "I need a doctor."
+      },
+      "audioAssetId": "audio-doctor-01",
+      "audioAsset": "audio/en-IN/doctor.mp3",
+      "category": "MEDICAL",
+      "displayCategory": "MEDICAL",
+      "description": "Request for medical doctor or physician assistance. Bent fingertips (M-hand or bent hand) tapping radial artery pulse point on inner wrist."
+    },
+    {
+      "intent": "MEDICINE",
+      "phraseKey": "phrase.medicine",
+      "caption": "I need medicine.",
+      "captions": {
+        "en-IN": "I need medicine.",
+        "en-US": "I need medicine."
+      },
+      "audioAssetId": "audio-medicine-01",
+      "audioAsset": "audio/en-IN/medicine.mp3",
+      "category": "MEDICAL",
+      "displayCategory": "MEDICAL",
+      "description": "Request for medication or prescription. Middle finger tip pivoting in circular motion on palm of non-dominant hand as if grinding mortar and pestle."
+    },
+    {
+      "intent": "WASHROOM",
+      "phraseKey": "phrase.washroom",
+      "caption": "I need the washroom.",
+      "captions": {
+        "en-IN": "I need the washroom.",
+        "en-US": "I need the restroom."
+      },
+      "audioAssetId": "audio-washroom-01",
+      "audioAsset": "audio/en-IN/washroom.mp3",
+      "category": "BASIC_NEEDS",
+      "displayCategory": "BASIC_NEEDS",
+      "description": "Request to use restroom or washroom facilities. 'T' handshape (thumb between index and middle fingers) shaken gently side to side."
+    },
+    {
+      "intent": "YES",
+      "phraseKey": "phrase.yes",
+      "caption": "Yes.",
+      "captions": {
+        "en-IN": "Yes.",
+        "en-US": "Yes."
+      },
+      "audioAssetId": "audio-yes-01",
+      "audioAsset": "audio/en-IN/yes.mp3",
+      "category": "CONVERSATIONAL",
+      "displayCategory": "CONVERSATIONAL",
+      "description": "Affirmation or agreement. Closed fist nodding up and down from wrist imitating head nod."
+    },
+    {
+      "intent": "NO",
+      "phraseKey": "phrase.no",
+      "caption": "No.",
+      "captions": {
+        "en-IN": "No.",
+        "en-US": "No."
+      },
+      "audioAssetId": "audio-no-01",
+      "audioAsset": "audio/en-IN/no.mp3",
+      "category": "CONVERSATIONAL",
+      "displayCategory": "CONVERSATIONAL",
+      "description": "Negation or refusal. Index and middle fingers snapping down onto thumb repeatedly."
+    },
+    {
+      "intent": "REPEAT",
+      "phraseKey": "phrase.repeat",
+      "caption": "Please repeat.",
+      "captions": {
+        "en-IN": "Please repeat.",
+        "en-US": "Please repeat."
+      },
+      "audioAssetId": "audio-repeat-01",
+      "audioAsset": "audio/en-IN/repeat.mp3",
+      "category": "ASSISTANCE",
+      "displayCategory": "ASSISTANCE",
+      "description": "Request for repetition or re-signing. Bent open hand moving in an arc back towards the body or flipping over palm-up."
+    },
+    {
+      "intent": "THANK_YOU",
+      "phraseKey": "phrase.thank_you",
+      "caption": "Thank you.",
+      "captions": {
+        "en-IN": "Thank you.",
+        "en-US": "Thank you."
+      },
+      "audioAssetId": "audio-thank-you-01",
+      "audioAsset": "audio/en-IN/thank_you.mp3",
+      "category": "CONVERSATIONAL",
+      "displayCategory": "CONVERSATIONAL",
+      "description": "Expression of gratitude. Flat open hand with fingertips touching chin or lips, moving outward toward the other person."
+    },
+    {
+      "intent": "NO_SIGN",
+      "phraseKey": "phrase.no_sign",
+      "caption": "",
+      "captions": {
+        "en-IN": "",
+        "en-US": ""
+      },
+      "audioAssetId": null,
+      "audioAsset": null,
+      "category": "SYSTEM",
+      "displayCategory": "SYSTEM",
+      "description": "Rest position, neutral hand posture, or absence of active vocabulary gesture. Suppresses caption rendering and audio playback."
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"fixture_id": "fixture-c-invalid-input", "label": "C: Invalid Input", "description": "Quality SIGNAL_PRESENT check fails. SIGNAL_INVALID. No candidate.", "intent_label": null, "model_score": null, "policy_route": "SIGNAL_INVALID", "quality_pass": false, "force_quality_fail": "SIGNAL_PRESENT", "human_action": null, "provenance": "REPLAY"}

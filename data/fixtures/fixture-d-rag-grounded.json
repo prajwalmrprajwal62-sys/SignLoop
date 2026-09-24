@@ -1,0 +1,1 @@
+{"fixture_id": "fixture-d-rag-grounded", "label": "D: RAG Grounded", "description": "WHY_TASK query retrieves TNOTE-001 + EVID-001. Status: GROUNDED.", "rag_query_type": "WHY_TASK", "rag_source_ids": ["TNOTE-001", "EVID-001"], "expected_tutor_status": "GROUNDED", "quality_pass": true, "provenance": "REPLAY"}
