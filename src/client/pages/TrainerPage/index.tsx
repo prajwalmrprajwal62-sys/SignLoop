@@ -1,271 +1,499 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { GlassCard } from '../../components/common/GlassCard';
 import { SectionHeader } from '../../components/common/SectionHeader';
-import { MonoLabel } from '../../components/common/MonoLabel';
 import { useProfileStore } from '../../stores/profileStore';
 import { apiGet, apiPost } from '../../api/client';
-import { Users, FileText, Save } from 'lucide-react';
+import {
+  Users, AlertTriangle, CheckCircle, ChevronRight,
+  FileText, Save, BookOpen, Zap, Lightbulb,
+} from 'lucide-react';
+import { motion } from 'framer-motion';
 
-interface Candidate {
-  candidate_id: string;
-  intent_label: string;
-  score: number | null;
-  policy_route: string;
-  why_reason_code: string | null;
-  session_id: string;
-  provenance: string;
+interface StudentProfile {
+  id: string;
+  pseudonymous_code: string;
+  role: string;
+  preferred_locale: string;
 }
 
-interface Decision {
-  decision_id: string;
-  action: string;
-  final_intent: string | null;
-  created_at: string;
+interface PracticeTask {
+  task_id: string;
+  profile_id: string;
+  intent_id: string;
+  instruction: string;
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  status: string;
+  target_repetitions: number;
+  completed_repetitions: number;
 }
+
+interface FollowUpCase {
+  case_id: string;
+  profile_id: string;
+  intent_id: string;
+  correction_reason: string;
+  status: string;
+}
+
+const GESTURE_EMOJI: Record<string, string> = {
+  HELP: '🆘', WATER: '💧', FOOD: '🍽️', PAIN: '😣', DOCTOR: '🏥',
+  MEDICINE: '💊', WASHROOM: '🚻', YES: '✅', NO: '❌', REPEAT: '🔁', THANK_YOU: '🙏',
+};
+
+const ALL_INTENTS = [
+  'HELP','WATER','FOOD','PAIN','DOCTOR','MEDICINE','WASHROOM','YES','NO','REPEAT','THANK_YOU',
+];
+
+type TeacherTab = 'students' | 'followups' | 'note';
 
 export function TrainerPage() {
-  const { activeProfileId, role, contextType } = useProfileStore();
-  const [allCandidates] = useState<Candidate[]>([]);
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
-  const [decisions, setDecisions] = useState<Decision[]>([]);
+  const { activeProfileId, contextType } = useProfileStore();
+  const location = useLocation();
+  const [tab, setTab] = useState<TeacherTab>(
+    location.pathname === '/knowledge' ? 'note' : 'students'
+  );
+
+  // Update tab if route changes while component is mounted
+  useEffect(() => {
+    if (location.pathname === '/knowledge') setTab('note');
+    else if (location.pathname === '/trainer') setTab('students');
+  }, [location.pathname]);
+
+  // Student data
+  const [students, setStudents] = useState<StudentProfile[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
+  const [studentTasks, setStudentTasks] = useState<PracticeTask[]>([]);
+  const [followUps, setFollowUps] = useState<FollowUpCase[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+
+  // Note editor
+  const [noteIntent, setNoteIntent] = useState('HELP');
   const [noteText, setNoteText] = useState('');
-  const [noteStatus, setNoteStatus] = useState<'DRAFT' | 'APPROVED'>('DRAFT');
-  const [loading, setLoading] = useState(false);
+  const [noteTargetStudent, setNoteTargetStudent] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
 
-  // Fetch all sessions for this profile, then all their candidates
+  // Load all STUDENT profiles
   useEffect(() => {
-    if (!activeProfileId) return;
-    setLoading(true);
-    // There's no GET /api/candidates endpoint — candidates are per-session.
-    // We fetch profile's sessions from the session timeline approach.
-    // For the trainer page we surface a queue of REVIEW_REQUIRED candidates.
-    // Since we cannot list all sessions easily, we surface placeholder state.
-    setLoading(false);
-  }, [activeProfileId]);
+    setLoadingStudents(true);
+    apiGet<{ ok: boolean; profiles: StudentProfile[] }>('/api/profiles')
+      .then(res => {
+        const studs = (res.profiles ?? []).filter(p => p.role === 'STUDENT');
+        setStudents(studs);
+        if (studs.length > 0) {
+          setSelectedStudent(studs[0] ?? null);
+          setNoteTargetStudent(studs[0]?.id ?? '');
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoadingStudents(false));
+  }, []);
 
-  // When a candidate is selected, load its decisions
+  // Load selected student's tasks and follow-ups
   useEffect(() => {
-    if (!selectedCandidate) { setDecisions([]); return; }
-    apiGet<{ ok: boolean; decisions: Decision[] }>(
-      `/api/candidates/${selectedCandidate.candidate_id}/decisions`
-    )
-      .then(res => setDecisions(res.decisions ?? []))
-      .catch(console.error);
-  }, [selectedCandidate]);
+    if (!selectedStudent) return;
+    apiGet<{ ok: boolean; tasks: PracticeTask[] }>(
+      `/api/practice/tasks?profile_id=${selectedStudent.id}`
+    ).then(res => setStudentTasks(res.tasks ?? [])).catch(console.error);
 
-  const handleDecision = async (action: 'CONFIRM' | 'CORRECT' | 'REJECT') => {
-    if (!selectedCandidate || !activeProfileId) return;
-    const endpointMap = { CONFIRM: 'confirm', CORRECT: 'correct', REJECT: 'reject' };
-    try {
-      await apiPost(`/api/candidates/${selectedCandidate.candidate_id}/${endpointMap[action]}`, {
-        actor_role: 'TEACHER',
-        actor_profile_id: activeProfileId,
-        session_id: selectedCandidate.session_id,
-        profile_id: activeProfileId,
-        context: contextType ?? 'LEARNING_PRACTICE',
-        role: role ?? 'TEACHER',
-        provenance: 'LIVE',
-        final_intent: selectedCandidate.intent_label,
-      });
-      // Reload decisions
-      const res = await apiGet<{ ok: boolean; decisions: Decision[] }>(
-        `/api/candidates/${selectedCandidate.candidate_id}/decisions`
-      );
-      setDecisions(res.decisions ?? []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+    apiGet<{ ok: boolean; followUps: FollowUpCase[] }>(
+      `/api/practice/followups?profile_id=${selectedStudent.id}`
+    ).then(res => setFollowUps(res.followUps ?? [])).catch(console.error);
+  }, [selectedStudent]);
 
   const handleSaveNote = async () => {
-    if (!noteText.trim() || !selectedCandidate || !activeProfileId) return;
+    if (!noteText.trim() || !activeProfileId) return;
+    setNoteSaving(true);
+    setNoteSaved(false);
     try {
       await apiPost('/api/knowledge/sources', {
         source_class: 'TEACHER_KNOWLEDGE',
-        profile_id: activeProfileId,
-        intent_id: selectedCandidate.intent_label,
+        profile_id: noteTargetStudent || null,
+        intent_id: noteIntent,
         author_id: activeProfileId,
         author_role: 'TEACHER',
-        content: noteText,
+        content: noteText.trim(),
         content_type: 'text/plain',
         locale: 'en-IN',
         consent_scope: contextType ?? 'LEARNING_PRACTICE',
         retention_class: 'PERMANENT_AUDIT',
         supersedes_id: null,
-        session_id: selectedCandidate.session_id,
+        session_id: null,
         event_id: null,
         task_id: null,
         context: contextType ?? 'LEARNING_PRACTICE',
-        source_title: `Teacher note for ${selectedCandidate.intent_label}`,
+        source_title: `Teacher note: ${noteIntent}${noteTargetStudent ? ' (for student)' : ''}`,
       });
       setNoteText('');
+      setNoteSaved(true);
+      setTimeout(() => setNoteSaved(false), 3000);
     } catch (err) {
       console.error(err);
+    } finally {
+      setNoteSaving(false);
     }
   };
 
+  const completionRate = (task: PracticeTask) =>
+    task.target_repetitions > 0
+      ? Math.round((task.completed_repetitions / task.target_repetitions) * 100)
+      : 0;
+
   return (
-    <div className="flex h-[calc(100vh-6rem)] -mx-4">
-      {/* Left sidebar — review queue */}
-      <div className="w-72 shrink-0 bg-zinc-950 border-r border-white/10 overflow-y-auto flex flex-col">
-        <div className="p-4 border-b border-white/5">
-          <SectionHeader className="flex items-center gap-2">
-            <Users size={12} /> Review Queue
-          </SectionHeader>
+    <div className="max-w-5xl mx-auto space-y-5">
+      {/* Teacher header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold text-white">Teacher Dashboard</h1>
+          <p className="text-slate-500 text-sm mt-0.5">
+            Monitor students, review follow-ups, and add knowledge notes that feed the student tutor.
+          </p>
         </div>
-        <div className="p-3 space-y-2 flex-1">
-          {allCandidates.map(c => (
-            <div
-              key={c.candidate_id}
-              onClick={() => setSelectedCandidate(c)}
-              className={`p-3 rounded-xl cursor-pointer border-l-4 transition-all ${
-                selectedCandidate?.candidate_id === c.candidate_id
-                  ? 'bg-white/10'
-                  : 'bg-zinc-900/50 hover:bg-zinc-900'
-              } ${
-                c.policy_route === 'REVIEW_REQUIRED'
-                  ? 'border-amber-500'
-                  : c.policy_route === 'SIGNAL_INVALID'
-                    ? 'border-red-500'
-                    : c.provenance === 'SIMULATED'
-                      ? 'border-blue-500'
-                      : 'border-zinc-700'
-              }`}
-            >
-              <div className="flex justify-between items-center mb-1">
-                <span className="font-bold text-white text-sm uppercase">{c.intent_label}</span>
-                {c.score !== null && (
-                  <MonoLabel className="text-[11px]">{Math.round((c.score) * 100)}%</MonoLabel>
-                )}
-              </div>
-              <StatusBadge status={c.policy_route} size="xs" />
-            </div>
-          ))}
-          {allCandidates.length === 0 && (
-            <div className="p-4 text-center">
-              <p className="text-zinc-600 text-xs font-mono">No candidates in queue.</p>
-              <p className="text-zinc-700 text-[11px] mt-1">Run a fixture on Live page to populate.</p>
-            </div>
-          )}
-          {loading && (
-            <p className="text-zinc-600 text-xs font-mono text-center p-4 animate-pulse">Loading…</p>
-          )}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-violet-400/30 bg-violet-400/8 text-violet-300 text-xs font-mono font-semibold">
+          <BookOpen size={12} />
+          Notes you add here → Student RAG tutor
         </div>
       </div>
 
-      {/* Main area */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {selectedCandidate ? (
-          <div className="max-w-3xl mx-auto space-y-6">
-            {/* Evidence card */}
-            <GlassCard className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-white">Evidence Card</h2>
-                <StatusBadge status={selectedCandidate.policy_route} size="md" />
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="bg-black/30 p-3 rounded-lg">
-                  <SectionHeader className="mb-1">Gesture Intent</SectionHeader>
-                  <span className="text-white font-bold uppercase">{selectedCandidate.intent_label}</span>
-                </div>
-                <div className="bg-black/30 p-3 rounded-lg">
-                  <SectionHeader className="mb-1">Model Score</SectionHeader>
-                  <MonoLabel>
-                    {selectedCandidate.score !== null
-                      ? `${Math.round((selectedCandidate.score) * 100)}% model score`
-                      : 'Score unavailable'}
-                  </MonoLabel>
-                </div>
-                <div className="bg-black/30 p-3 rounded-lg">
-                  <SectionHeader className="mb-1">Why</SectionHeader>
-                  <span className="text-zinc-300 text-xs">{selectedCandidate.why_reason_code ?? '—'}</span>
-                </div>
-                <div className="bg-black/30 p-3 rounded-lg">
-                  <SectionHeader className="mb-1">Session</SectionHeader>
-                  <MonoLabel className="text-[10px]">{selectedCandidate.session_id.slice(0, 16)}…</MonoLabel>
-                </div>
-              </div>
-            </GlassCard>
+      {/* Tabs */}
+      <div className="flex gap-0 border-b border-white/8">
+        {([
+          { key: 'students' as TeacherTab, label: 'Student Overview', icon: <Users size={13} /> },
+          { key: 'followups' as TeacherTab, label: 'Follow-ups to Review', icon: <AlertTriangle size={13} /> },
+          { key: 'note' as TeacherTab, label: 'Add Teacher Note', icon: <FileText size={13} /> },
+        ]).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
+              tab === t.key
+                ? 'border-violet-400 text-white'
+                : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-600'
+            }`}
+          >
+            {t.icon}
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-            {/* Decisions history */}
-            {decisions.length > 0 && (
-              <GlassCard className="p-5">
-                <SectionHeader className="mb-3">Decision History</SectionHeader>
-                <div className="space-y-2">
-                  {decisions.map(d => (
-                    <div key={d.decision_id} className="flex items-center gap-3 text-sm">
-                      <StatusBadge status={d.action} size="xs" />
-                      <span className="text-zinc-400 text-xs font-mono">{d.final_intent ?? '—'}</span>
-                      <span className="text-zinc-600 text-[10px] ml-auto">{new Date(d.created_at).toLocaleTimeString()}</span>
+      {/* ─── STUDENT OVERVIEW TAB ─────────────────────────────────── */}
+      {tab === 'students' && (
+        <motion.div key="students" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="grid grid-cols-12 gap-5">
+            {/* Student list */}
+            <div className="col-span-4 space-y-2">
+              <SectionHeader className="mb-2">Your Students</SectionHeader>
+              {loadingStudents && (
+                <p className="text-slate-500 text-xs font-mono animate-pulse">Loading…</p>
+              )}
+              {students.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setSelectedStudent(s)}
+                  className={`w-full text-left p-4 rounded-2xl border transition-all ${
+                    selectedStudent?.id === s.id
+                      ? 'border-violet-400/40 bg-violet-400/8'
+                      : 'border-white/8 hover:border-white/15'
+                  }`}
+                  style={{ background: selectedStudent?.id === s.id ? undefined : 'rgba(255,255,255,0.03)' }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white font-mono">{s.pseudonymous_code}</span>
+                    <ChevronRight size={14} className="text-slate-500" />
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-mono uppercase">{s.role}</span>
+                </button>
+              ))}
+              {students.length === 0 && !loadingStudents && (
+                <p className="text-slate-600 text-xs font-mono">No student profiles found.</p>
+              )}
+            </div>
+
+            {/* Selected student detail */}
+            <div className="col-span-8 space-y-4">
+              {selectedStudent ? (
+                <>
+                  <GlassCard className="p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-violet-400/15 border border-violet-400/30 flex items-center justify-center">
+                        <span className="text-violet-400 font-bold text-sm font-mono">
+                          {selectedStudent.pseudonymous_code.slice(0, 2)}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-bold text-white font-mono">{selectedStudent.pseudonymous_code}</p>
+                        <p className="text-slate-500 text-xs">{selectedStudent.preferred_locale} · STUDENT</p>
+                      </div>
                     </div>
+
+                    {/* Practice tasks */}
+                    <SectionHeader className="mb-3">Assigned Practice Tasks</SectionHeader>
+                    {studentTasks.length === 0 ? (
+                      <p className="text-slate-600 text-xs font-mono">No tasks assigned yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {studentTasks.map(task => (
+                          <div
+                            key={task.task_id}
+                            className="p-3 rounded-xl border border-white/6"
+                            style={{ background: 'rgba(255,255,255,0.03)' }}
+                          >
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="text-xl">{GESTURE_EMOJI[task.intent_id] ?? '👋'}</span>
+                              <span className="font-bold text-white uppercase text-sm flex-1">{task.intent_id}</span>
+                              <StatusBadge status={task.status} size="xs" />
+                            </div>
+                            {task.instruction && (
+                              <p className="text-slate-400 text-xs italic mb-2">"{task.instruction}"</p>
+                            )}
+                            {/* Progress bar */}
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 rounded-full bg-slate-700 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-violet-400 transition-all"
+                                  style={{ width: `${completionRate(task)}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] font-mono text-slate-500">
+                                {task.completed_repetitions}/{task.target_repetitions}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </GlassCard>
+
+                  {/* Quick note for this student */}
+                  <GlassCard className="p-5 border border-violet-400/15">
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText size={13} className="text-violet-400" />
+                      <SectionHeader>Add a Quick Note for {selectedStudent.pseudonymous_code}</SectionHeader>
+                    </div>
+                    <p className="text-slate-500 text-xs mb-3">
+                      Notes you write here are stored in the knowledge base and feed directly into the student's RAG tutor.
+                      When they ask "Why this task?" the tutor will cite your note.
+                    </p>
+                    <div className="flex gap-2 mb-2">
+                      <select
+                        value={noteIntent}
+                        onChange={e => setNoteIntent(e.target.value)}
+                        className="rounded-lg px-3 py-1.5 text-white font-mono text-xs border border-white/10 focus:outline-none"
+                        style={{ background: '#1e293b' }}
+                      >
+                        {ALL_INTENTS.map(i => (
+                          <option key={i} value={i}>{GESTURE_EMOJI[i]} {i}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <textarea
+                      className="w-full rounded-xl p-3 text-white text-sm h-20 font-mono focus:outline-none resize-none border border-white/10"
+                      style={{ background: 'rgba(255,255,255,0.05)' }}
+                      placeholder={`Write an instruction for ${selectedStudent.pseudonymous_code} about ${noteIntent}…`}
+                      value={noteText}
+                      onChange={e => setNoteText(e.target.value)}
+                    />
+                    <div className="flex items-center gap-3 mt-2">
+                      <button
+                        onClick={() => {
+                          setNoteTargetStudent(selectedStudent.id);
+                          void handleSaveNote();
+                        }}
+                        disabled={!noteText.trim() || noteSaving}
+                        className="flex items-center gap-1.5 px-5 h-9 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold disabled:opacity-50 transition-all"
+                      >
+                        <Save size={12} />
+                        {noteSaving ? 'Saving…' : 'Save Note → Student Tutor'}
+                      </button>
+                      {noteSaved && (
+                        <span className="flex items-center gap-1 text-emerald-400 text-xs font-mono">
+                          <CheckCircle size={12} /> Saved to knowledge base
+                        </span>
+                      )}
+                    </div>
+                  </GlassCard>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-48 text-center">
+                  <Users size={36} className="text-slate-700 mb-3" />
+                  <p className="text-slate-500 font-mono text-sm">Select a student to view their progress</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ─── FOLLOW-UPS TAB ───────────────────────────────────────── */}
+      {tab === 'followups' && (
+        <motion.div key="followups" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+          <div className="rounded-2xl border border-amber-500/20 p-4 mb-2" style={{ background: 'rgba(245,158,11,0.06)' }}>
+            <p className="text-amber-300 text-sm font-semibold mb-1">
+              <AlertTriangle size={13} className="inline mr-1" /> What are follow-ups?
+            </p>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              When a student's gesture gets a model score below the 75% routing gate, it's flagged as a follow-up case.
+              These need your attention — review them, understand the pattern, and add a note or assign a practice task.
+            </p>
+          </div>
+
+          {/* Student selector */}
+          <div className="flex gap-2 flex-wrap">
+            {students.map(s => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedStudent(s)}
+                className={`px-4 py-2 rounded-xl border text-sm font-mono font-semibold transition-all ${
+                  selectedStudent?.id === s.id
+                    ? 'border-amber-400/40 bg-amber-400/10 text-amber-300'
+                    : 'border-white/10 text-slate-400 hover:text-white'
+                }`}
+                style={{ background: selectedStudent?.id === s.id ? undefined : 'rgba(255,255,255,0.04)' }}
+              >
+                {s.pseudonymous_code}
+              </button>
+            ))}
+          </div>
+
+          {selectedStudent && (
+            <div>
+              <SectionHeader className="mb-3">
+                Follow-up cases for {selectedStudent.pseudonymous_code}
+              </SectionHeader>
+              {followUps.length === 0 ? (
+                <GlassCard className="p-8 text-center">
+                  <CheckCircle size={32} className="text-emerald-500 mx-auto mb-2" />
+                  <p className="text-slate-300 font-semibold">No open follow-up cases!</p>
+                  <p className="text-slate-500 text-sm mt-1">This student has no pending review cases.</p>
+                </GlassCard>
+              ) : (
+                <div className="space-y-3">
+                  {followUps.map(f => (
+                    <GlassCard key={f.case_id} className="p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl mt-0.5">{GESTURE_EMOJI[f.intent_id] ?? '👋'}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-bold text-white uppercase">{f.intent_id}</span>
+                            <StatusBadge status={f.status} size="xs" />
+                          </div>
+                          <p className="text-slate-400 text-sm italic">"{f.correction_reason}"</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Zap size={14} className="text-amber-400 mt-0.5" />
+                        </div>
+                      </div>
+                    </GlassCard>
                   ))}
                 </div>
-              </GlassCard>
-            )}
+              )}
+            </div>
+          )}
+        </motion.div>
+      )}
 
-            {/* Decision actions */}
-            {decisions.length === 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => void handleDecision('CONFIRM')}
-                  className="h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-all"
-                >
-                  CONFIRM
-                </button>
-                <button
-                  onClick={() => void handleDecision('CORRECT')}
-                  className="h-12 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition-all"
-                >
-                  CORRECT
-                </button>
-                <button
-                  onClick={() => void handleDecision('REJECT')}
-                  className="h-12 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm transition-all"
-                >
-                  REJECT
-                </button>
+      {/* ─── ADD NOTE TAB ─────────────────────────────────────────── */}
+      {tab === 'note' && (
+        <motion.div key="note" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="max-w-2xl space-y-5">
+            <div className="rounded-2xl border border-violet-500/20 p-4" style={{ background: 'rgba(139,92,246,0.06)' }}>
+              <p className="text-violet-300 text-sm font-semibold mb-1">
+                <Lightbulb size={13} className="inline mr-1" /> How notes feed the RAG tutor
+              </p>
+              <p className="text-slate-400 text-xs leading-relaxed">
+                Every note you write is stored in the knowledge base with <strong className="text-white">TEACHER_KNOWLEDGE</strong> source class.
+                When a student asks their tutor "Why this task?" or "What should I practice?" — the tutor retrieves your exact note
+                and cites it as the source. No hallucination, only your words.
+              </p>
+            </div>
+
+            <GlassCard className="p-6 space-y-4">
+              <SectionHeader>Write a Teacher Note</SectionHeader>
+
+              {/* Gesture */}
+              <div>
+                <label className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-2">
+                  Gesture (Intent)
+                </label>
+                <div className="grid grid-cols-5 gap-2">
+                  {ALL_INTENTS.map(intent => (
+                    <button
+                      key={intent}
+                      onClick={() => setNoteIntent(intent)}
+                      className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all text-center ${
+                        noteIntent === intent
+                          ? 'border-violet-400/50 bg-violet-400/10 text-white'
+                          : 'border-white/8 text-slate-400 hover:border-white/20'
+                      }`}
+                      style={{ background: noteIntent === intent ? undefined : 'rgba(255,255,255,0.03)' }}
+                    >
+                      <span className="text-xl">{GESTURE_EMOJI[intent] ?? '👋'}</span>
+                      <span className="text-[9px] font-mono font-semibold">{intent.replace('_', ' ')}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            )}
 
-            {/* Teacher note editor */}
-            <GlassCard className="p-5">
-              <SectionHeader className="mb-3 flex items-center gap-2">
-                <FileText size={12} /> Teacher Note
-              </SectionHeader>
-              <textarea
-                className="w-full bg-zinc-900 border border-white/10 rounded-lg p-3 text-white text-sm h-24 font-mono focus:outline-none focus:border-violet-500/50 resize-none"
-                placeholder={`Enter instructions for ${selectedCandidate.intent_label}…`}
-                value={noteText}
-                onChange={e => setNoteText(e.target.value)}
-              />
-              <div className="flex gap-2 mt-2">
+              {/* Target student (optional) */}
+              <div>
+                <label className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-2">
+                  For student (optional — leave blank for all)
+                </label>
                 <select
-                  className="bg-zinc-900 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none"
-                  value={noteStatus}
-                  onChange={e => setNoteStatus(e.target.value as 'DRAFT' | 'APPROVED')}
+                  value={noteTargetStudent}
+                  onChange={e => setNoteTargetStudent(e.target.value)}
+                  className="rounded-lg px-3 py-2 text-white font-mono text-sm border border-white/10 focus:outline-none w-full"
+                  style={{ background: '#1e293b' }}
                 >
-                  <option value="DRAFT">DRAFT</option>
-                  <option value="APPROVED">APPROVED</option>
+                  <option value="">All students</option>
+                  {students.map(s => (
+                    <option key={s.id} value={s.id}>{s.pseudonymous_code}</option>
+                  ))}
                 </select>
-                <button
-                  onClick={() => void handleSaveNote()}
-                  disabled={!noteText.trim()}
-                  className="flex items-center gap-1.5 px-4 h-8 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold disabled:opacity-50 transition-all"
-                >
-                  <Save size={12} /> SAVE NOTE
-                </button>
               </div>
+
+              {/* Note content */}
+              <div>
+                <label className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-2">
+                  Instruction / Observation
+                </label>
+                <textarea
+                  className="w-full rounded-xl p-4 text-white text-sm h-32 font-mono focus:outline-none resize-none border border-white/10 placeholder-slate-600"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
+                  placeholder={`e.g. "Student is confusing ${noteIntent} and REPEAT. Practice them separately before combining…"`}
+                  value={noteText}
+                  onChange={e => setNoteText(e.target.value)}
+                />
+                <p className="text-slate-600 text-[11px] mt-1 font-mono">
+                  {noteText.trim().length} chars · This exact text will be retrieved and cited by the student's tutor.
+                </p>
+              </div>
+
+              <button
+                onClick={() => void handleSaveNote()}
+                disabled={!noteText.trim() || noteSaving}
+                className="flex items-center gap-2 px-6 h-11 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm disabled:opacity-50 transition-all"
+              >
+                <Save size={14} />
+                {noteSaving ? 'Saving to knowledge base…' : 'Save Note → Student RAG Tutor'}
+              </button>
+
+              {noteSaved && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 text-emerald-400 text-sm font-mono"
+                >
+                  <CheckCircle size={14} />
+                  Saved! The student's tutor can now cite this note.
+                </motion.div>
+              )}
             </GlassCard>
           </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <FileText size={48} className="text-zinc-700 mb-4" />
-            <p className="text-zinc-500 font-mono">Select a candidate to review</p>
-            <p className="text-zinc-600 text-xs mt-1">Run a fixture on the Live page to populate the queue.</p>
-          </div>
-        )}
-      </div>
+        </motion.div>
+      )}
     </div>
   );
 }

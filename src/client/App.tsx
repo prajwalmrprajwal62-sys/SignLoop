@@ -30,6 +30,8 @@ export function App() {
           <Route path="/live" element={<LivePage />} />
           <Route path="/practice" element={<PracticePage />} />
           <Route path="/trainer" element={<TrainerPage />} />
+          {/* /knowledge is the teacher ADD NOTE shortcut — handled by TrainerPage with tab query */}
+          <Route path="/knowledge" element={<TrainerPage />} />
           <Route path="/communication" element={<CommunicationPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
