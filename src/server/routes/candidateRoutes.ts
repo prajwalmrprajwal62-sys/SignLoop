@@ -90,4 +90,44 @@ router.get('/:id/decisions', (req: Request<{ id: string }>, res: Response) => {
   }
 });
 
+// GET /api/teacher/review-queue — all REVIEW_REQUIRED candidates across all student sessions
+// Teacher→Student connection: student gesture below 75% → appears here for teacher review
+router.get('/teacher/review-queue', (_req: Request, res: Response) => {
+  try {
+    const { getDb } = require('../db/connection') as { getDb: () => import('better-sqlite3').Database };
+    const database = getDb();
+
+    // Join candidates → sessions → profiles to get full context
+    const reviewItems = database.prepare(`
+      SELECT
+        c.candidate_id,
+        c.intent_label,
+        c.score,
+        c.policy_route,
+        c.why_reason_code,
+        c.created_at,
+        s.id as session_id,
+        s.profile_id,
+        s.context,
+        s.provenance,
+        p.pseudonymous_code,
+        p.role as profile_role
+      FROM candidates c
+      JOIN sessions s ON s.id = c.session_id
+      JOIN profiles p ON p.id = s.profile_id
+      WHERE c.policy_route = 'REVIEW_REQUIRED'
+        AND p.role = 'STUDENT'
+        AND NOT EXISTS (
+          SELECT 1 FROM human_decisions hd WHERE hd.candidate_id = c.candidate_id
+        )
+      ORDER BY c.created_at DESC
+      LIMIT 50
+    `).all();
+
+    return res.json({ ok: true, reviewItems });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
 export default router;

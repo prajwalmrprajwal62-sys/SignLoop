@@ -267,54 +267,24 @@ export function TrainerPage() {
                     )}
                   </GlassCard>
 
-                  {/* Quick note for this student */}
-                  <GlassCard className="p-5 border border-violet-400/15">
-                    <div className="flex items-center gap-2 mb-3">
-                      <FileText size={13} className="text-violet-400" />
-                      <SectionHeader>Add a Quick Note for {selectedStudent.pseudonymous_code}</SectionHeader>
+                  {/* Direct to dedicated note editor — no duplication */}
+                  <div className="rounded-xl border border-violet-400/15 p-4 flex items-center gap-3"
+                    style={{ background: 'rgba(139,92,246,0.06)' }}>
+                    <FileText size={14} className="text-violet-400 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-violet-300 text-sm font-semibold">Add a note for {selectedStudent.pseudonymous_code}</p>
+                      <p className="text-slate-500 text-xs mt-0.5">
+                        Go to <span className="text-white font-mono">ADD NOTE</span> tab to write an instruction.
+                        Notes are student-specific and feed directly into their RAG tutor.
+                      </p>
                     </div>
-                    <p className="text-slate-500 text-xs mb-3">
-                      Notes you write here are stored in the knowledge base and feed directly into the student's RAG tutor.
-                      When they ask "Why this task?" the tutor will cite your note.
-                    </p>
-                    <div className="flex gap-2 mb-2">
-                      <select
-                        value={noteIntent}
-                        onChange={e => setNoteIntent(e.target.value)}
-                        className="rounded-lg px-3 py-1.5 text-white font-mono text-xs border border-white/10 focus:outline-none"
-                        style={{ background: '#1e293b' }}
-                      >
-                        {ALL_INTENTS.map(i => (
-                          <option key={i} value={i}>{GESTURE_EMOJI[i]} {i}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <textarea
-                      className="w-full rounded-xl p-3 text-white text-sm h-20 font-mono focus:outline-none resize-none border border-white/10"
-                      style={{ background: 'rgba(255,255,255,0.05)' }}
-                      placeholder={`Write an instruction for ${selectedStudent.pseudonymous_code} about ${noteIntent}…`}
-                      value={noteText}
-                      onChange={e => setNoteText(e.target.value)}
-                    />
-                    <div className="flex items-center gap-3 mt-2">
-                      <button
-                        onClick={() => {
-                          setNoteTargetStudent(selectedStudent.id);
-                          void handleSaveNote();
-                        }}
-                        disabled={!noteText.trim() || noteSaving}
-                        className="flex items-center gap-1.5 px-5 h-9 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold disabled:opacity-50 transition-all"
-                      >
-                        <Save size={12} />
-                        {noteSaving ? 'Saving…' : 'Save Note → Student Tutor'}
-                      </button>
-                      {noteSaved && (
-                        <span className="flex items-center gap-1 text-emerald-400 text-xs font-mono">
-                          <CheckCircle size={12} /> Saved to knowledge base
-                        </span>
-                      )}
-                    </div>
-                  </GlassCard>
+                    <button
+                      onClick={() => { setNoteTargetStudent(selectedStudent.id); setTab('note'); }}
+                      className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all shrink-0"
+                    >
+                      Add Note →
+                    </button>
+                  </div>
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center h-48 text-center">

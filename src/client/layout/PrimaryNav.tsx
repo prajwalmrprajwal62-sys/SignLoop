@@ -20,7 +20,7 @@ const ROLE_NAV: Record<string, Array<{ to: string; label: string; icon: React.Re
   ],
   TEACHER: [
     { to: '/trainer',       label: 'STUDENTS',  icon: <Users size={14} /> },
-    { to: '/live',          label: 'REVIEW',    icon: <Radio size={14} /> },
+    { to: '/review',        label: 'REVIEW',    icon: <Radio size={14} /> },
     { to: '/knowledge',     label: 'ADD NOTE',  icon: <Lightbulb size={14} /> },
     { to: '/communication', label: 'COMMS',     icon: <MessageSquare size={14} /> },
     { to: '/profile',       label: 'MY PROFILE',icon: <User size={14} /> },

@@ -6,6 +6,7 @@ import { RoleSelectPage } from './pages/RoleSelectPage';
 import { LivePage } from './pages/LivePage';
 import { PracticePage } from './pages/PracticePage';
 import { TrainerPage } from './pages/TrainerPage';
+import { ReviewQueuePage } from './pages/ReviewQueuePage';
 import { CommunicationPage } from './pages/CommunicationPage';
 import { ProfilePage } from './pages/ProfilePage';
 
@@ -30,7 +31,8 @@ export function App() {
           <Route path="/live" element={<LivePage />} />
           <Route path="/practice" element={<PracticePage />} />
           <Route path="/trainer" element={<TrainerPage />} />
-          {/* /knowledge is the teacher ADD NOTE shortcut — handled by TrainerPage with tab query */}
+          <Route path="/review" element={<ReviewQueuePage />} />
+          {/* /knowledge is the teacher ADD NOTE shortcut — handled by TrainerPage */}
           <Route path="/knowledge" element={<TrainerPage />} />
           <Route path="/communication" element={<CommunicationPage />} />
           <Route path="/profile" element={<ProfilePage />} />
