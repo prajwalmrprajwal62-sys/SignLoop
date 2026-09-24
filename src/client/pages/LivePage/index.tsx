@@ -14,10 +14,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 type SourceType = 'GLOVE' | 'CAMERA' | 'SIMULATED' | 'REPLAY';
 
 interface QualityCheck {
-  check_id: string;
-  check_name: string;
+  // Server returns { id, name } — QualityService.ts line 22-23
+  id?: string;
+  check_id?: string;     // defensive fallback
+  name?: string;
+  check_name?: string;   // defensive fallback
   status: 'PASS' | 'FAIL' | 'NOT_EVALUATED';
   observed_value: string | null;
+  threshold_or_rule?: string | null;
   repair_hint: string | null;
 }
 
@@ -300,30 +304,35 @@ export function LivePage() {
               <p className="text-slate-500 text-xs font-mono">Run quality check to validate sensor input.</p>
             ) : (
               <div className="space-y-2">
-                {qualityChecks.map(qc => (
-                  <div
-                    key={qc.check_id}
-                    className={`p-2.5 rounded-lg ${qc.status === 'FAIL' ? 'border-l-4 border-amber-500' : ''}`}
-                    style={{ background: 'rgba(30,41,59,0.6)' }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {qc.status === 'PASS'
-                          ? <CheckCircle size={13} className="text-emerald-500 shrink-0" />
-                          : qc.status === 'FAIL'
-                            ? <XCircle size={13} className="text-red-500 shrink-0" />
-                            : <Clock size={13} className="text-slate-500 shrink-0" />}
-                        <span className="text-slate-300 text-xs font-mono">
-                          {CHECK_LABELS[qc.check_name] ?? qc.check_name.replace(/_/g, ' ')}
-                        </span>
+                {qualityChecks.map((qc, idx) => {
+                  // QualityService returns { id, name } — handle both field name styles defensively
+                  const checkKey = qc.id ?? qc.check_id ?? String(idx);
+                  const checkName = qc.name ?? qc.check_name ?? 'UNKNOWN';
+                  return (
+                    <div
+                      key={checkKey}
+                      className={`p-2.5 rounded-lg ${qc.status === 'FAIL' ? 'border-l-4 border-amber-500' : ''}`}
+                      style={{ background: 'rgba(30,41,59,0.6)' }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {qc.status === 'PASS'
+                            ? <CheckCircle size={13} className="text-emerald-500 shrink-0" />
+                            : qc.status === 'FAIL'
+                              ? <XCircle size={13} className="text-red-500 shrink-0" />
+                              : <Clock size={13} className="text-slate-500 shrink-0" />}
+                          <span className="text-slate-300 text-xs font-mono">
+                            {CHECK_LABELS[checkName] ?? checkName.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        <StatusBadge status={qc.status} size="xs" />
                       </div>
-                      <StatusBadge status={qc.status} size="xs" />
+                      {qc.status === 'FAIL' && qc.repair_hint && (
+                        <p className="text-[11px] text-amber-400 italic mt-1 ml-5">{qc.repair_hint}</p>
+                      )}
                     </div>
-                    {qc.status === 'FAIL' && qc.repair_hint && (
-                      <p className="text-[11px] text-amber-400 italic mt-1 ml-5">{qc.repair_hint}</p>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </GlassCard>
