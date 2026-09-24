@@ -1,10 +1,15 @@
 import { create } from 'zustand';
 
+// Matches what QualityService.ts actually returns at runtime:
+// { id, name, status, observed_value, threshold_or_rule, repair_hint }
 interface QualityCheck {
-  check_id: string;
-  check_name: string;
+  id?: string;           // server field (primary)
+  check_id?: string;     // defensive alias
+  name?: string;         // server field (primary)
+  check_name?: string;   // defensive alias
   status: 'PASS' | 'FAIL' | 'NOT_EVALUATED';
   observed_value: string | null;
+  threshold_or_rule?: string | null;
   repair_hint: string | null;
 }
 
