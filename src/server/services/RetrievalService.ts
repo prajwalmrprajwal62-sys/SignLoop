@@ -56,8 +56,16 @@ export class RetrievalService {
             AND ks.source_class IN (${allowedClasses.map(() => '?').join(',')})
             AND ks.status NOT IN (${EXCLUDED_STATUSES.map(() => '?').join(',')})
             AND (
-              ks.source_class IN ('TEACHER_KNOWLEDGE', 'APPROVED_TRAINING')
+              -- APPROVED_TRAINING: always globally available (seed knowledge, curriculum)
+              ks.source_class = 'APPROVED_TRAINING'
               OR (
+                -- TEACHER_KNOWLEDGE: global notes (profile_id IS NULL) OR student-specific Q&A for THIS student only
+                -- FIX P0.3: student-specific Q&A (profile_id NOT NULL) must not leak to other students
+                ks.source_class = 'TEACHER_KNOWLEDGE'
+                AND (ks.profile_id IS NULL OR ks.profile_id = ?)
+              )
+              OR (
+                -- STUDENT_EVIDENCE: always scoped to this student
                 ks.source_class = 'STUDENT_EVIDENCE'
                 AND ks.profile_id = ?
               )
@@ -69,7 +77,8 @@ export class RetrievalService {
           ftsQuery,
           ...allowedClasses,
           ...EXCLUDED_STATUSES,
-          params.profileId,
+          params.profileId, // TEACHER_KNOWLEDGE student-scope
+          params.profileId, // STUDENT_EVIDENCE scope
           params.context
         ) as Array<{ source_id: string; source_class: SourceClass; content: string; intent_id: string | null; relevance_score: number }>;
 
@@ -87,7 +96,12 @@ export class RetrievalService {
         WHERE source_class IN (${allowedClasses.map(() => '?').join(',')})
           AND status NOT IN (${EXCLUDED_STATUSES.map(() => '?').join(',')})
           AND (
-            source_class IN ('TEACHER_KNOWLEDGE', 'APPROVED_TRAINING')
+            source_class = 'APPROVED_TRAINING'
+            OR (
+              -- FIX P0.3: student-specific TEACHER_KNOWLEDGE only for this student
+              source_class = 'TEACHER_KNOWLEDGE'
+              AND (profile_id IS NULL OR profile_id = ?)
+            )
             OR (source_class = 'STUDENT_EVIDENCE' AND profile_id = ?)
           )
           AND (intent_id IS NULL OR intent_id LIKE ?)
@@ -97,7 +111,8 @@ export class RetrievalService {
       `).all(
         ...allowedClasses,
         ...EXCLUDED_STATUSES,
-        params.profileId,
+        params.profileId, // TEACHER_KNOWLEDGE scope
+        params.profileId, // STUDENT_EVIDENCE scope
         `%${params.intentId}%`,
         params.context
       ) as Array<{ source_id: string; source_class: SourceClass; content: string; intent_id: string | null; relevance_score: number }>;

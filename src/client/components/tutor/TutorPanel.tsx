@@ -113,8 +113,8 @@ export function TutorPanel({ profileId, contextType, role, consentGranted, inten
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-violet-500/15" style={{ background: 'rgba(139,92,246,0.08)' }}>
         <BookOpen size={13} className="text-violet-400" />
-        <span className="text-violet-300 text-xs font-semibold uppercase tracking-wider">AI Sign Tutor</span>
-        <span className="ml-auto text-[10px] font-mono text-slate-600">RAG · grounded</span>
+        <span className="text-violet-300 text-xs font-semibold uppercase tracking-wider">Sign Language Tutor</span>
+        <span className="ml-auto text-[10px] font-mono text-slate-600">local knowledge</span>
       </div>
 
       {/* Quick-action buttons */}
