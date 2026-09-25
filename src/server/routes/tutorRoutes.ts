@@ -2,7 +2,7 @@ import 'dotenv/config'; // Load .env before anything else
 import { Router, type Request, type Response } from 'express';
 import { RetrievalService } from '../services/RetrievalService';
 import { GroundingValidator } from '../services/GroundingValidator';
-import { ClaudeService } from '../services/ClaudeService';
+import { GeminiService } from '../services/GeminiService';
 import { getDb } from '../db/connection';
 import type { TutorQueryType } from '../../shared/types/retrieval';
 import type { TutorResponse } from '../../shared/types/retrieval';
@@ -86,8 +86,8 @@ router.post('/tutor/respond', async (req: Request, res: Response) => {
     }
 
     // Step 3: Synthesize answer
-    // Try Claude first — falls back to template if no API key or error
-    const synthesis = await ClaudeService.synthesize({
+    // Try Gemini first — falls back to template if no API key or error
+    const synthesis = await GeminiService.synthesize({
       queryText: query_text ?? '',
       queryType: query_type,
       intentId: intent_id,
@@ -107,10 +107,10 @@ router.post('/tutor/respond', async (req: Request, res: Response) => {
       intentId: intent_id,
     });
 
-    // Override answer_text with Claude's if available and better
+    // Use Gemini answer if available, else template fallback
     const finalAnswerText = synthesis.answer_text || validation.answer_text;
     const finalStatus = synthesis.grounding_level === 'GENERAL_KNOWLEDGE'
-      ? 'GROUNDED'  // Claude answered from general knowledge — still a valid answer
+      ? 'GROUNDED'  // Gemini answered from general knowledge — still a valid answer
       : validation.status;
 
     // Step 5: Persist tutor response
@@ -126,7 +126,7 @@ router.post('/tutor/respond', async (req: Request, res: Response) => {
       evidence_window: null,
       retrieval_status: finalStatus as TutorResponse['retrieval_status'],
       abstention_reason: synthesis.grounding_level === 'FALLBACK' ? validation.abstention_reason : null,
-      policy_version: synthesis.used_claude ? 'claude-rag-v1' : 'rag-policy-v1',
+      policy_version: synthesis.used_gemini ? 'gemini-rag-v1' : 'rag-policy-v1',
       index_version: 'local-fts-v1',
       created_at: now,
     };

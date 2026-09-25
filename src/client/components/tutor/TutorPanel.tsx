@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { HelpCircle, Eye, ChevronRight, MessageCircle, Loader2, Send, BookOpen } from 'lucide-react';
+import { HelpCircle, Eye, ChevronRight, BookOpen, Loader2, Send, Sparkles } from 'lucide-react';
 import { apiPost } from '../../api/client';
 import { TutorResponseView } from './TutorResponse';
 
@@ -30,11 +30,12 @@ interface ChatMessage {
   loading?: boolean;
 }
 
+// Quick buttons — all go through general RAG retrieval now
 const QUICK_BUTTONS = [
-  { label: 'Why this task?', queryType: 'WHY_TASK', icon: <HelpCircle size={12} /> },
-  { label: 'Show gesture', queryType: 'SHOW_REFERENCE', icon: <Eye size={12} /> },
-  { label: "What's next?", queryType: 'WHAT_NEXT', icon: <ChevronRight size={12} /> },
-  { label: 'Ask teacher', queryType: 'ASK_TEACHER', icon: <MessageCircle size={12} /> },
+  { label: 'Why this task?',  queryType: 'WHY_TASK',       icon: <HelpCircle size={12} /> },
+  { label: 'Show gesture',    queryType: 'SHOW_REFERENCE', icon: <Eye size={12} /> },
+  { label: "What's next?",    queryType: 'WHAT_NEXT',      icon: <ChevronRight size={12} /> },
+  { label: 'How to improve?', queryType: 'WHY_TASK',       icon: <Sparkles size={12} /> },
 ];
 
 export function TutorPanel({ profileId, contextType, role, consentGranted, intentId, sessionId }: TutorPanelProps) {
@@ -44,9 +45,9 @@ export function TutorPanel({ profileId, contextType, role, consentGranted, inten
   const [activeQueryType, setActiveQueryType] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-run ASK_TEACHER on mount so it's open by default
+  // Auto-run SHOW_REFERENCE on mount to show gesture info immediately
   useEffect(() => {
-    void handleQuery('ASK_TEACHER', 'Ask teacher');
+    void handleQuery('SHOW_REFERENCE', 'How to sign this gesture');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -59,6 +60,7 @@ export function TutorPanel({ profileId, contextType, role, consentGranted, inten
     if (!consentGranted) return;
     const userMsgId = crypto.randomUUID();
     const tutorMsgId = crypto.randomUUID();
+    // For free text: use the typed question as query text so FTS5 can search it
     const queryText = customText ?? intentId ?? '';
 
     setMessages(prev => [
@@ -102,7 +104,8 @@ export function TutorPanel({ profileId, contextType, role, consentGranted, inten
     const text = freeText.trim();
     if (!text || submitting) return;
     setFreeText('');
-    void handleQuery('ASK_TEACHER', text, text);
+    // Free text → use WHY_TASK so it goes through full RAG retrieval
+    void handleQuery('WHY_TASK', text, text);
   };
 
   return (
@@ -110,22 +113,18 @@ export function TutorPanel({ profileId, contextType, role, consentGranted, inten
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-violet-500/15" style={{ background: 'rgba(139,92,246,0.08)' }}>
         <BookOpen size={13} className="text-violet-400" />
-        <span className="text-violet-300 text-xs font-semibold uppercase tracking-wider">Teacher-Grounded Tutor</span>
-        <span className="ml-auto text-[10px] font-mono text-slate-600">RAG · no hallucination</span>
+        <span className="text-violet-300 text-xs font-semibold uppercase tracking-wider">AI Sign Tutor</span>
+        <span className="ml-auto text-[10px] font-mono text-slate-600">RAG · grounded</span>
       </div>
 
       {/* Quick-action buttons */}
       <div className="flex flex-wrap gap-1.5 px-4 pt-3">
         {QUICK_BUTTONS.map(({ label, queryType, icon }) => (
           <button
-            key={queryType}
+            key={label}
             onClick={() => void handleQuery(queryType, label)}
             disabled={submitting}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all disabled:opacity-40 ${
-              queryType === 'ASK_TEACHER'
-                ? 'border-violet-400/40 bg-violet-500/15 text-violet-200 hover:bg-violet-500/25'
-                : 'border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'
-            }`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all disabled:opacity-40 border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
           >
             {activeQueryType === queryType ? <Loader2 size={11} className="animate-spin" /> : icon}
             {label}
@@ -137,7 +136,7 @@ export function TutorPanel({ profileId, contextType, role, consentGranted, inten
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3" style={{ maxHeight: 340 }}>
         {messages.length === 0 && (
           <div className="text-center py-8">
-            <p className="text-slate-600 text-xs font-mono">Loading teacher knowledge…</p>
+            <p className="text-slate-600 text-xs font-mono">Loading sign language knowledge…</p>
           </div>
         )}
         {messages.map(msg => (
@@ -154,7 +153,7 @@ export function TutorPanel({ profileId, contextType, role, consentGranted, inten
                 {msg.loading ? (
                   <div className="flex items-center gap-2 px-3 py-2 rounded-xl rounded-bl-sm" style={{ background: 'rgba(255,255,255,0.04)' }}>
                     <Loader2 size={12} className="animate-spin text-violet-400" />
-                    <span className="text-slate-500 text-xs font-mono">Searching teacher knowledge…</span>
+                    <span className="text-slate-500 text-xs font-mono">Searching knowledge base…</span>
                   </div>
                 ) : msg.response ? (
                   <TutorResponseView response={msg.response} compact />
@@ -178,7 +177,7 @@ export function TutorPanel({ profileId, contextType, role, consentGranted, inten
             value={freeText}
             onChange={e => setFreeText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
-            placeholder="Type a question for the tutor…"
+            placeholder="Ask about any gesture, technique, or tip…"
             className="flex-1 bg-transparent text-xs text-white placeholder-slate-600 outline-none font-mono"
           />
           <button
@@ -190,7 +189,7 @@ export function TutorPanel({ profileId, contextType, role, consentGranted, inten
           </button>
         </div>
         <p className="text-[10px] text-slate-700 font-mono mt-1.5 text-center">
-          Answers grounded in teacher notes only · no LLM guessing
+          Answers from sign language knowledge base · personalized to your practice
         </p>
       </div>
     </div>

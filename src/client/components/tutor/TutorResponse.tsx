@@ -20,7 +20,7 @@ export function TutorResponseView({ response, compact }: { response: TutorRespon
     response.retrieval_status === 'SOURCES_CONFLICT';
 
   if (isAbstained) {
-    return <AbstentionCard status={response.retrieval_status} compact={compact} />;
+    return <AbstentionCard status={response.retrieval_status} compact={compact} answerText={response.answer_text} />;
   }
 
   if (compact) {

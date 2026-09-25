@@ -61,8 +61,9 @@ export class GroundingValidator {
       case 'WHAT_NEXT': answerText = TEMPLATES.WHAT_NEXT(results); break;
       case 'PROGRESS': answerText = TEMPLATES.PROGRESS(results); break;
       case 'SHOW_REFERENCE': answerText = TEMPLATES.SHOW_REFERENCE(results); break;
-      case 'ASK_TEACHER': answerText = TEMPLATES.ASK_TEACHER(); break;
-      default: answerText = TEMPLATES.WHY_TASK(results, params.intentId ?? '');
+      // ASK_TEACHER: treat same as SHOW_REFERENCE — use retrieved knowledge to answer
+      case 'ASK_TEACHER': answerText = TEMPLATES.SHOW_REFERENCE(results); break;
+      default: answerText = TEMPLATES.SHOW_REFERENCE(results);
     }
 
     return {
