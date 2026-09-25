@@ -5,7 +5,7 @@ import { GlassCard } from '../../components/common/GlassCard';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { useProfileStore } from '../../stores/profileStore';
 import { apiGet } from '../../api/client';
-import { Target, ChevronRight, BookOpen, MessageCircle } from 'lucide-react';
+import { Target, ChevronRight, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface PracticeTask {
@@ -106,6 +106,35 @@ export function PracticePage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {/* Always-visible tutor banner at the top */}
+      <div
+        className="rounded-2xl border border-violet-500/30 p-4 flex items-center justify-between gap-4 cursor-pointer hover:border-violet-500/50 transition-all"
+        style={{ background: 'rgba(139,92,246,0.07)' }}
+        onClick={() => setShowTutor(v => !v)}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">🎓</span>
+          <div>
+            <p className="text-violet-200 font-bold text-sm">Teacher-Grounded Tutor</p>
+            <p className="text-slate-400 text-xs">Answers grounded in your teacher's notes and approved training</p>
+          </div>
+        </div>
+        <span className="text-violet-400 text-xs font-mono font-semibold border border-violet-500/30 rounded-lg px-3 py-1.5 bg-violet-500/10">
+          {showTutor ? 'HIDE ▲' : 'ASK TUTOR ▼'}
+        </span>
+      </div>
+
+      {/* Tutor panel — always togglable, not buried inside task card */}
+      {showTutor && (
+        <TutorPanel
+          profileId={activeProfileId ?? ''}
+          contextType={contextType ?? 'LEARNING_PRACTICE'}
+          role={role ?? 'STUDENT'}
+          consentGranted={true}
+          intentId={activeTask?.intent_id}
+        />
+      )}
+
       <div className="grid grid-cols-12 gap-6">
         {/* LEFT — Active practice task (visual heavy) */}
         <div className="col-span-7 space-y-5">
@@ -164,27 +193,17 @@ export function PracticePage() {
                 {/* Action buttons */}
                 <div className="flex flex-col gap-3 max-w-xs mx-auto w-full">
                   <button
-                    onClick={() => setShowTutor(false)}
                     className="h-14 rounded-2xl text-slate-950 font-extrabold text-base tracking-wider w-full transition-all hover:scale-[1.02] active:scale-[0.98]"
                     style={{ background: `linear-gradient(90deg, ${meta.color}, ${meta.color}cc)` }}
                   >
                     PRACTICE NOW
                   </button>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setShowTutor(false)}
-                      className="border border-white/15 text-white h-11 rounded-xl text-sm font-semibold transition-all hover:bg-white/8"
-                      style={{ background: 'rgba(255,255,255,0.05)' }}
-                    >
-                      SHOW AGAIN
-                    </button>
-                    <button
-                      onClick={() => setShowTutor(true)}
-                      className="border border-violet-500/30 bg-violet-500/10 text-violet-300 h-11 rounded-xl text-sm font-semibold transition-all hover:bg-violet-500/15"
-                    >
-                      ASK TUTOR
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setShowTutor(v => !v)}
+                    className="border border-violet-500/30 bg-violet-500/10 text-violet-300 h-11 rounded-xl text-sm font-semibold transition-all hover:bg-violet-500/15"
+                  >
+                    {showTutor ? 'HIDE TUTOR' : 'ASK TUTOR'}
+                  </button>
                 </div>
               </GlassCard>
 
@@ -212,7 +231,7 @@ export function PracticePage() {
               <Target size={44} className="text-slate-600" />
               <div>
                 <p className="text-slate-300 font-semibold text-lg">No active practice tasks</p>
-                <p className="text-slate-500 text-sm mt-1">Your teacher will assign tasks to your profile. Check back after your next session.</p>
+                <p className="text-slate-500 text-sm mt-1">Your teacher will assign tasks to your profile. Use the tutor above to explore or ask questions.</p>
               </div>
             </GlassCard>
           )}
@@ -252,35 +271,32 @@ export function PracticePage() {
           )}
         </div>
 
-        {/* RIGHT — Tutor panel */}
-        <div className="col-span-5">
-          <div className="sticky top-20">
-            <div className="flex items-center gap-2 mb-3">
-              <BookOpen size={14} className="text-violet-400" />
-              <SectionHeader>Teacher-Grounded Tutor</SectionHeader>
-            </div>
-            {showTutor || (
+        {/* RIGHT — All 11 gestures reference panel in grid */}
+        <div className="col-span-5 space-y-3">
+          <SectionHeader>Sign Language Reference</SectionHeader>
+          <p className="text-slate-500 text-xs mb-2">All 11 gestures you can sign with the glove</p>
+          <div className="grid grid-cols-2 gap-2">
+            {Object.entries(GESTURE_META).map(([key, g]) => (
               <div
-                className="rounded-2xl border border-violet-500/20 p-5 text-center cursor-pointer hover:border-violet-500/40 transition-all"
-                style={{ background: 'rgba(139,92,246,0.05)' }}
-                onClick={() => setShowTutor(true)}
+                key={key}
+                className="rounded-xl border p-2.5 flex items-start gap-2 transition-all hover:border-white/20 relative"
+                style={{
+                  background: `${g.color}09`,
+                  borderColor: `${g.color}30`,
+                }}
               >
-                <div className="text-3xl mb-2">🎓</div>
-                <p className="text-slate-300 text-sm font-semibold">Personalized guidance</p>
-                <p className="text-slate-500 text-xs mt-1 leading-relaxed">
-                  Based on your teacher's notes and your own interaction history. Click "Ask Tutor" or any button below.
-                </p>
+                <span className="text-xl shrink-0">{g.emoji}</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="font-bold text-white text-[11px] uppercase">{key}</span>
+                    {activeTask?.intent_id === key && (
+                      <span className="text-[8px] font-mono bg-violet-500/20 text-violet-300 px-1 py-0.5 rounded border border-violet-500/30">NOW</span>
+                    )}
+                  </div>
+                  <p className="text-slate-500 text-[10px] italic leading-tight mt-0.5 line-clamp-1">"{g.caption}"</p>
+                </div>
               </div>
-            )}
-            {showTutor && (
-              <TutorPanel
-                profileId={activeProfileId ?? ''}
-                contextType={contextType ?? 'LEARNING_PRACTICE'}
-                role={role ?? 'STUDENT'}
-                consentGranted={true}
-                intentId={activeTask?.intent_id}
-              />
-            )}
+            ))}
           </div>
         </div>
       </div>
