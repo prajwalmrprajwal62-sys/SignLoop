@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { GlassCard } from '../../components/common/GlassCard';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { useProfileStore } from '../../stores/profileStore';
-import { apiGet, apiPost } from '../../api/client';
+import { apiGet } from '../../api/client';
 import {
   Users, AlertTriangle, CheckCircle, ChevronRight,
-  FileText, Save, BookOpen, Zap, Lightbulb, TrendingUp, TrendingDown, Activity,
+  FileText, BookOpen, Zap, TrendingUp, TrendingDown, Activity,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -59,23 +59,17 @@ const GESTURE_EMOJI: Record<string, string> = {
   MEDICINE: '💊', WASHROOM: '🚻', YES: '✅', NO: '❌', REPEAT: '🔁', THANK_YOU: '🙏',
 };
 
-const ALL_INTENTS = [
-  'HELP','WATER','FOOD','PAIN','DOCTOR','MEDICINE','WASHROOM','YES','NO','REPEAT','THANK_YOU',
-];
-
-type TeacherTab = 'students' | 'followups' | 'note';
+type TeacherTab = 'students' | 'followups';
 
 export function TrainerPage() {
-  const { activeProfileId, contextType } = useProfileStore();
+  const { } = useProfileStore();
   const location = useLocation();
-  const [tab, setTab] = useState<TeacherTab>(
-    location.pathname === '/knowledge' ? 'note' : 'students'
-  );
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<TeacherTab>('students');
 
   // Update tab if route changes while component is mounted
   useEffect(() => {
-    if (location.pathname === '/knowledge') setTab('note');
-    else if (location.pathname === '/trainer') setTab('students');
+    if (location.pathname === '/trainer') setTab('students');
   }, [location.pathname]);
 
   // Student data
@@ -86,13 +80,6 @@ export function TrainerPage() {
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [studentSummary, setStudentSummary] = useState<StudentSummary | null>(null);
 
-  // Note editor
-  const [noteIntent, setNoteIntent] = useState('HELP');
-  const [noteText, setNoteText] = useState('');
-  const [noteTargetStudent, setNoteTargetStudent] = useState('');
-  const [noteSaving, setNoteSaving] = useState(false);
-  const [noteSaved, setNoteSaved] = useState(false);
-
   // Load all STUDENT profiles
   useEffect(() => {
     setLoadingStudents(true);
@@ -102,7 +89,6 @@ export function TrainerPage() {
         setStudents(studs);
         if (studs.length > 0) {
           setSelectedStudent(studs[0] ?? null);
-          setNoteTargetStudent(studs[0]?.id ?? '');
         }
       })
       .catch(console.error)
@@ -126,39 +112,6 @@ export function TrainerPage() {
     ).then(res => setStudentSummary(res.summary ?? null)).catch(console.error);
   }, [selectedStudent]);
 
-  const handleSaveNote = async () => {
-    if (!noteText.trim() || !activeProfileId) return;
-    setNoteSaving(true);
-    setNoteSaved(false);
-    try {
-      await apiPost('/api/knowledge/sources', {
-        source_class: 'TEACHER_KNOWLEDGE',
-        profile_id: noteTargetStudent || null,
-        intent_id: noteIntent,
-        author_id: activeProfileId,
-        author_role: 'TEACHER',
-        content: noteText.trim(),
-        content_type: 'INSTRUCTION',
-        locale: 'en-IN',
-        consent_scope: contextType ?? 'LEARNING_PRACTICE',
-        retention_class: 'PERMANENT_AUDIT',
-        supersedes_id: null,
-        session_id: null,
-        event_id: null,
-        task_id: null,
-        context: contextType ?? 'LEARNING_PRACTICE',
-        source_title: `Teacher note: ${noteIntent}${noteTargetStudent ? ' (for student)' : ''}`,
-      });
-      setNoteText('');
-      setNoteSaved(true);
-      setTimeout(() => setNoteSaved(false), 3000);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setNoteSaving(false);
-    }
-  };
-
   const completionRate = (task: PracticeTask) =>
     task.target_repetitions > 0
       ? Math.round((task.completed_repetitions / task.target_repetitions) * 100)
@@ -180,12 +133,11 @@ export function TrainerPage() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — only Student Overview and Follow-ups. Note editor lives at /knowledge (ADD NOTE nav) */}
       <div className="flex gap-0 border-b border-white/8">
         {([
           { key: 'students' as TeacherTab, label: 'Student Overview', icon: <Users size={13} /> },
           { key: 'followups' as TeacherTab, label: 'Follow-ups to Review', icon: <AlertTriangle size={13} /> },
-          { key: 'note' as TeacherTab, label: 'Add Teacher Note', icon: <FileText size={13} /> },
         ]).map(t => (
           <button
             key={t.key}
@@ -254,7 +206,7 @@ export function TrainerPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() => { setNoteTargetStudent(selectedStudent.id); setTab('note'); }}
+                        onClick={() => navigate('/knowledge', { state: { studentId: selectedStudent.id } })}
                         className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all flex items-center gap-1.5"
                       >
                         <FileText size={12} /> Add Note
@@ -270,7 +222,7 @@ export function TrainerPage() {
                           { label: 'Approved', value: studentSummary.stats.approved_outputs_count, icon: <CheckCircle size={12} className="text-emerald-400" /> },
                           { label: 'Avg model score', value: studentSummary.stats.avg_model_score != null ? `${studentSummary.stats.avg_model_score}%` : '—', icon: <TrendingUp size={12} className="text-violet-400" /> },
                           { label: 'Teacher notes', value: studentSummary.stats.teacher_notes_count, icon: <FileText size={12} className="text-violet-400" /> },
-                          { label: 'Last active', value: studentSummary.stats.last_active ? new Date(studentSummary.stats.last_active).toLocaleDateString() : 'Never', icon: <Lightbulb size={12} className="text-slate-400" /> },
+                          { label: 'Last active', value: studentSummary.stats.last_active ? new Date(studentSummary.stats.last_active).toLocaleDateString() : 'Never', icon: <Activity size={12} className="text-slate-400" /> },
                         ].map(s => (
                           <div key={s.label} className="rounded-xl border border-white/6 p-3" style={{ background: 'rgba(255,255,255,0.03)' }}>
                             <div className="flex items-center gap-1 mb-1">{s.icon}<span className="text-[10px] text-slate-500 font-mono uppercase">{s.label}</span></div>
@@ -461,105 +413,6 @@ export function TrainerPage() {
         </motion.div>
       )}
 
-      {/* ─── ADD NOTE TAB ─────────────────────────────────────────── */}
-      {tab === 'note' && (
-        <motion.div key="note" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="max-w-2xl space-y-5">
-            <div className="rounded-2xl border border-violet-500/20 p-4" style={{ background: 'rgba(139,92,246,0.06)' }}>
-              <p className="text-violet-300 text-sm font-semibold mb-1">
-                <Lightbulb size={13} className="inline mr-1" /> How notes feed the RAG tutor
-              </p>
-              <p className="text-slate-400 text-xs leading-relaxed">
-                Every note you write is stored in the knowledge base with <strong className="text-white">TEACHER_KNOWLEDGE</strong> source class.
-                When a student asks their tutor "Why this task?" or "What should I practice?" — the tutor retrieves your exact note
-                and cites it as the source. No hallucination, only your words.
-              </p>
-            </div>
-
-            <GlassCard className="p-6 space-y-4">
-              <SectionHeader>Write a Teacher Note</SectionHeader>
-
-              {/* Gesture */}
-              <div>
-                <label className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-2">
-                  Gesture (Intent)
-                </label>
-                <div className="grid grid-cols-5 gap-2">
-                  {ALL_INTENTS.map(intent => (
-                    <button
-                      key={intent}
-                      onClick={() => setNoteIntent(intent)}
-                      className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all text-center ${
-                        noteIntent === intent
-                          ? 'border-violet-400/50 bg-violet-400/10 text-white'
-                          : 'border-white/8 text-slate-400 hover:border-white/20'
-                      }`}
-                      style={{ background: noteIntent === intent ? undefined : 'rgba(255,255,255,0.03)' }}
-                    >
-                      <span className="text-xl">{GESTURE_EMOJI[intent] ?? '👋'}</span>
-                      <span className="text-[9px] font-mono font-semibold">{intent.replace('_', ' ')}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Target student (optional) */}
-              <div>
-                <label className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-2">
-                  For student (optional — leave blank for all)
-                </label>
-                <select
-                  value={noteTargetStudent}
-                  onChange={e => setNoteTargetStudent(e.target.value)}
-                  className="rounded-lg px-3 py-2 text-white font-mono text-sm border border-white/10 focus:outline-none w-full"
-                  style={{ background: '#1e293b' }}
-                >
-                  <option value="">All students</option>
-                  {students.map(s => (
-                    <option key={s.id} value={s.id}>{s.pseudonymous_code}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Note content */}
-              <div>
-                <label className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-2">
-                  Instruction / Observation
-                </label>
-                <textarea
-                  className="w-full rounded-xl p-4 text-white text-sm h-32 font-mono focus:outline-none resize-none border border-white/10 placeholder-slate-600"
-                  style={{ background: 'rgba(255,255,255,0.05)' }}
-                  placeholder={`e.g. "Student is confusing ${noteIntent} and REPEAT. Practice them separately before combining…"`}
-                  value={noteText}
-                  onChange={e => setNoteText(e.target.value)}
-                />
-                <p className="text-slate-600 text-[11px] mt-1 font-mono">
-                  {noteText.trim().length} chars · This exact text will be retrieved and cited by the student's tutor.
-                </p>
-              </div>
-
-              <button
-                onClick={() => void handleSaveNote()}
-                disabled={!noteText.trim() || noteSaving}
-                className="flex items-center gap-2 px-6 h-11 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm disabled:opacity-50 transition-all"
-              >
-                <Save size={14} />
-                {noteSaving ? 'Saving to knowledge base…' : 'Save Note → Student RAG Tutor'}
-              </button>
-
-              {noteSaved && (
-                <motion.div
-                  initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-2 text-emerald-400 text-sm font-mono"
-                >
-                  <CheckCircle size={14} />
-                  Saved! The student's tutor can now cite this note.
-                </motion.div>
-              )}
-            </GlassCard>
-          </div>
-        </motion.div>
-      )}
     </div>
   );
 }

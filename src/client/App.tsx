@@ -10,6 +10,7 @@ import { ReviewQueuePage } from './pages/ReviewQueuePage';
 import { CommunicationPage } from './pages/CommunicationPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { StudentReviewPage } from './pages/StudentReviewPage';
+import { AddNotePage } from './pages/AddNotePage';
 
 export function App() {
   return (
@@ -34,8 +35,8 @@ export function App() {
           <Route path="/my-review" element={<StudentReviewPage />} />
           <Route path="/trainer" element={<TrainerPage />} />
           <Route path="/review" element={<ReviewQueuePage />} />
-          {/* /knowledge is the teacher ADD NOTE shortcut — handled by TrainerPage */}
-          <Route path="/knowledge" element={<TrainerPage />} />
+          {/* /knowledge is the ADD NOTE nav item — dedicated note editor for teachers */}
+          <Route path="/knowledge" element={<AddNotePage />} />
           <Route path="/communication" element={<CommunicationPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>

@@ -99,7 +99,7 @@ export class TeacherKnowledgeService {
     });
   }
 
-  static getForProfile(profileId: string, statuses: KnowledgeStatus[] = ['APPROVED', 'ACTIVE']): KnowledgeSource[] {
+  static getForProfile(profileId: string, statuses: KnowledgeStatus[] = ['DRAFT', 'APPROVED', 'ACTIVE']): KnowledgeSource[] {
     const placeholders = statuses.map(() => '?').join(',');
     return getDb().prepare(
       `SELECT * FROM knowledge_sources WHERE profile_id = ? AND status IN (${placeholders}) ORDER BY created_at DESC`
