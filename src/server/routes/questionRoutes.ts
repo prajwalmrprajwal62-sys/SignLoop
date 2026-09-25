@@ -75,7 +75,7 @@ router.get('/pending', (_req: Request, res: Response) => {
     const questions = db.prepare(`
       SELECT sq.*, p.pseudonymous_code AS student_code
       FROM student_questions sq
-      LEFT JOIN profiles p ON p.profile_id = sq.profile_id
+      LEFT JOIN profiles p ON p.id = sq.profile_id
       WHERE sq.status = 'PENDING'
       ORDER BY sq.created_at ASC
     `).all() as (StudentQuestion & { student_code: string })[];
