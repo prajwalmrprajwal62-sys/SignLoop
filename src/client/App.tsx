@@ -9,6 +9,7 @@ import { TrainerPage } from './pages/TrainerPage';
 import { ReviewQueuePage } from './pages/ReviewQueuePage';
 import { CommunicationPage } from './pages/CommunicationPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { StudentReviewPage } from './pages/StudentReviewPage';
 
 export function App() {
   return (
@@ -30,6 +31,7 @@ export function App() {
         <Route element={<AppShell />}>
           <Route path="/live" element={<LivePage />} />
           <Route path="/practice" element={<PracticePage />} />
+          <Route path="/my-review" element={<StudentReviewPage />} />
           <Route path="/trainer" element={<TrainerPage />} />
           <Route path="/review" element={<ReviewQueuePage />} />
           {/* /knowledge is the teacher ADD NOTE shortcut — handled by TrainerPage */}

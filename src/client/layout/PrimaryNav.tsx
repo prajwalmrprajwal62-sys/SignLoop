@@ -3,20 +3,21 @@ import { useProfileStore } from '../stores/profileStore';
 import { useEffect } from 'react';
 import {
   Radio, BookOpen, GraduationCap, MessageSquare, User,
-  Users, Lightbulb,
+  Users, Lightbulb, BarChart2,
 } from 'lucide-react';
 
 // ─── Role-specific navigation ────────────────────────────────────────────────
 //
-// STUDENT  → LIVE · PRACTICE · MY PROFILE
+// STUDENT  → LIVE · PRACTICE · MY REVIEW · MY PROFILE
 // TEACHER  → STUDENTS · REVIEW · ADD NOTE · COMMS · MY PROFILE
 // STAFF    → COMMUNICATE · MY PROFILE
 //
 const ROLE_NAV: Record<string, Array<{ to: string; label: string; icon: React.ReactNode }>> = {
   STUDENT: [
-    { to: '/live',     label: 'LIVE',       icon: <Radio size={14} /> },
-    { to: '/practice', label: 'PRACTICE',   icon: <BookOpen size={14} /> },
-    { to: '/profile',  label: 'MY PROFILE', icon: <User size={14} /> },
+    { to: '/live',      label: 'LIVE',       icon: <Radio size={14} /> },
+    { to: '/practice',  label: 'PRACTICE',   icon: <BookOpen size={14} /> },
+    { to: '/my-review', label: 'MY REVIEW',  icon: <BarChart2 size={14} /> },
+    { to: '/profile',   label: 'MY PROFILE', icon: <User size={14} /> },
   ],
   TEACHER: [
     { to: '/trainer',       label: 'STUDENTS',  icon: <Users size={14} /> },

@@ -262,4 +262,190 @@ router.get('/:id/summary', (req: Request<{ id: string }>, res: Response) => {
   }
 });
 
+// GET /api/profiles/:id/review — Student-facing intelligent review module
+// Shows mistakes, patterns, what they use most, and where to improve
+router.get('/:id/review', (req: Request<{ id: string }>, res: Response) => {
+  try {
+    const db = getDb();
+    const profile = ProfileService.getById(req.params.id);
+    if (!profile) return res.status(404).json({ ok: false, error: 'Profile not found' });
+
+    // --- All gesture attempts (candidates) with outcome ---
+    const allAttempts = db.prepare(`
+      SELECT c.intent_label, c.policy_route, c.score, c.created_at,
+             hd.action as decision_action
+      FROM candidates c
+      JOIN sessions s ON s.id = c.session_id
+      LEFT JOIN human_decisions hd ON hd.candidate_id = c.candidate_id
+      WHERE s.profile_id = ?
+      ORDER BY c.created_at DESC
+    `).all(req.params.id) as Array<{
+      intent_label: string; policy_route: string; score: number | null;
+      created_at: string; decision_action: string | null;
+    }>;
+
+    // --- Per-gesture breakdown ---
+    const gestureMap: Record<string, {
+      intent: string;
+      total_attempts: number;
+      passed_gate: number;
+      review_required: number;
+      confirmed: number;
+      corrected: number;
+      rejected: number;
+      avg_score: number | null;
+      scores: number[];
+      last_attempted: string | null;
+    }> = {};
+
+    for (const a of allAttempts) {
+      if (!gestureMap[a.intent_label]) {
+        gestureMap[a.intent_label] = {
+          intent: a.intent_label, total_attempts: 0,
+          passed_gate: 0, review_required: 0,
+          confirmed: 0, corrected: 0, rejected: 0,
+          avg_score: null, scores: [], last_attempted: null,
+        };
+      }
+      const g = gestureMap[a.intent_label]!;
+      g.total_attempts++;
+      if (a.policy_route === 'CANDIDATE_READY') g.passed_gate++;
+      if (a.policy_route === 'REVIEW_REQUIRED') g.review_required++;
+      if (a.decision_action === 'CONFIRM') g.confirmed++;
+      if (a.decision_action === 'CORRECT') g.corrected++;
+      if (a.decision_action === 'REJECT') g.rejected++;
+      if (a.score != null) g.scores.push(a.score);
+      if (!g.last_attempted || a.created_at > g.last_attempted) g.last_attempted = a.created_at;
+    }
+
+    // Compute avg scores
+    for (const g of Object.values(gestureMap)) {
+      if (g.scores.length > 0) {
+        g.avg_score = Math.round((g.scores.reduce((a, b) => a + b, 0) / g.scores.length) * 100);
+      }
+    }
+
+    const gestures = Object.values(gestureMap);
+
+    // --- Struggling gestures: high review_required rate ---
+    const struggling = gestures
+      .filter(g => g.total_attempts >= 1)
+      .sort((a, b) => {
+        const rateA = a.review_required / a.total_attempts;
+        const rateB = b.review_required / b.total_attempts;
+        return rateB - rateA;
+      })
+      .slice(0, 5)
+      .map(g => ({
+        intent: g.intent,
+        total_attempts: g.total_attempts,
+        review_required: g.review_required,
+        failure_rate: Math.round((g.review_required / g.total_attempts) * 100),
+        avg_score: g.avg_score,
+        last_attempted: g.last_attempted,
+      }));
+
+    // --- Strong gestures: high confirmed rate ---
+    const strong = gestures
+      .filter(g => g.confirmed + g.corrected > 0)
+      .sort((a, b) => {
+        const rateA = (a.confirmed + a.corrected) / a.total_attempts;
+        const rateB = (b.confirmed + b.corrected) / b.total_attempts;
+        return rateB - rateA;
+      })
+      .slice(0, 5)
+      .map(g => ({
+        intent: g.intent,
+        total_attempts: g.total_attempts,
+        confirmed: g.confirmed,
+        corrected: g.corrected,
+        success_rate: Math.round(((g.confirmed + g.corrected) / g.total_attempts) * 100),
+        avg_score: g.avg_score,
+      }));
+
+    // --- Recent mistakes (last 10 REVIEW_REQUIRED not yet decided or rejected) ---
+    const recentMistakes = db.prepare(`
+      SELECT c.candidate_id, c.intent_label, c.score, c.why_reason_code, c.created_at,
+             hd.action as decision_action, hd.note as teacher_note
+      FROM candidates c
+      JOIN sessions s ON s.id = c.session_id
+      LEFT JOIN human_decisions hd ON hd.candidate_id = c.candidate_id
+      WHERE s.profile_id = ? AND c.policy_route = 'REVIEW_REQUIRED'
+      ORDER BY c.created_at DESC LIMIT 10
+    `).all(req.params.id) as Array<{
+      candidate_id: string; intent_label: string; score: number | null;
+      why_reason_code: string; created_at: string;
+      decision_action: string | null; teacher_note: string | null;
+    }>;
+
+    // --- 7-day trend vs all-time average ---
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const recentRow = db.prepare(`
+      SELECT COUNT(*) as total,
+             SUM(CASE WHEN c.policy_route = 'CANDIDATE_READY' THEN 1 ELSE 0 END) as passed
+      FROM candidates c JOIN sessions s ON s.id = c.session_id
+      WHERE s.profile_id = ? AND c.created_at >= ?
+    `).get(req.params.id, sevenDaysAgo) as { total: number; passed: number };
+
+    const allTimeRow = db.prepare(`
+      SELECT COUNT(*) as total,
+             SUM(CASE WHEN c.policy_route = 'CANDIDATE_READY' THEN 1 ELSE 0 END) as passed
+      FROM candidates c JOIN sessions s ON s.id = c.session_id
+      WHERE s.profile_id = ?
+    `).get(req.params.id) as { total: number; passed: number };
+
+    const recentPassRate = recentRow.total > 0 ? Math.round((recentRow.passed / recentRow.total) * 100) : null;
+    const allTimePassRate = allTimeRow.total > 0 ? Math.round((allTimeRow.passed / allTimeRow.total) * 100) : null;
+
+    let trend: 'IMPROVING' | 'DECLINING' | 'STABLE' | 'INSUFFICIENT_DATA' = 'INSUFFICIENT_DATA';
+    if (recentPassRate != null && allTimePassRate != null && recentRow.total >= 3) {
+      if (recentPassRate > allTimePassRate + 5) trend = 'IMPROVING';
+      else if (recentPassRate < allTimePassRate - 5) trend = 'DECLINING';
+      else trend = 'STABLE';
+    }
+
+    // --- Teacher notes written for this student ---
+    const teacherNotes = db.prepare(`
+      SELECT source_id, intent_id, content, created_at
+      FROM knowledge_sources
+      WHERE profile_id = ? AND source_class = 'TEACHER_KNOWLEDGE'
+        AND status NOT IN ('REVOKED', 'SUPERSEDED')
+      ORDER BY created_at DESC LIMIT 10
+    `).all(req.params.id) as Array<{ source_id: string; intent_id: string | null; content: string; created_at: string }>;
+
+    // --- Most used (approved) gestures ---
+    const mostUsed = db.prepare(`
+      SELECT ao.final_intent, COUNT(*) as count
+      FROM approved_outputs ao
+      JOIN human_decisions hd ON hd.decision_id = ao.decision_id
+      JOIN candidates c ON c.candidate_id = hd.candidate_id
+      JOIN sessions s ON s.id = c.session_id
+      WHERE s.profile_id = ?
+      GROUP BY ao.final_intent ORDER BY count DESC LIMIT 5
+    `).all(req.params.id) as Array<{ final_intent: string; count: number }>;
+
+    return res.json({
+      ok: true,
+      review: {
+        profile,
+        overview: {
+          total_attempts: allTimeRow.total,
+          all_time_pass_rate: allTimePassRate,
+          recent_pass_rate: recentPassRate,
+          trend,
+          recent_attempts: recentRow.total,
+        },
+        struggling,
+        strong,
+        recent_mistakes: recentMistakes,
+        most_used: mostUsed,
+        teacher_notes: teacherNotes,
+        all_gestures: gestures,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
 export default router;
