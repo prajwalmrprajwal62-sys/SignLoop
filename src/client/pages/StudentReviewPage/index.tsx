@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useProfileStore } from '../../stores/profileStore';
-import { apiGet } from '../../api/client';
+import { apiGet, apiPost } from '../../api/client';
 import { GlassCard } from '../../components/common/GlassCard';
 import { SectionHeader } from '../../components/common/SectionHeader';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, Minus, AlertTriangle,
   CheckCircle, BarChart2, Clock, BookOpen, Zap,
+  MessageCircle, Send, ChevronDown, ChevronUp,
 } from 'lucide-react';
 
 // Gesture visuals — same as PracticePage
@@ -78,11 +79,31 @@ function ScoreBar({ rate, color }: { rate: number; color: string }) {
   );
 }
 
+interface StudentQuestion {
+  question_id: string;
+  profile_id: string;
+  question_text: string;
+  intent_id: string | null;
+  status: 'PENDING' | 'ANSWERED' | 'DISMISSED';
+  teacher_answer: string | null;
+  answered_by: string | null;
+  answered_at: string | null;
+  created_at: string;
+}
+
 export function StudentReviewPage() {
   const { activeProfileId } = useProfileStore();
   const [data, setData] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Q&A state
+  const [questions, setQuestions] = useState<StudentQuestion[]>([]);
+  const [qText, setQText] = useState('');
+  const [qSending, setQSending] = useState(false);
+  const [qError, setQError] = useState<string | null>(null);
+  const [qaOpen, setQaOpen] = useState(true);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!activeProfileId) return;
@@ -92,6 +113,36 @@ export function StudentReviewPage() {
       .catch(err => setError(String(err)))
       .finally(() => setLoading(false));
   }, [activeProfileId]);
+
+  // Fetch questions for this student
+  const fetchQuestions = () => {
+    if (!activeProfileId) return;
+    apiGet<{ ok: boolean; questions: StudentQuestion[] }>(`/api/questions?profile_id=${activeProfileId}`)
+      .then(res => setQuestions(res.questions ?? []))
+      .catch(console.error);
+  };
+
+  useEffect(() => {
+    fetchQuestions();
+  }, [activeProfileId]);
+
+  const handleAskTeacher = async () => {
+    if (!qText.trim() || !activeProfileId) return;
+    setQSending(true);
+    setQError(null);
+    try {
+      await apiPost('/api/questions', {
+        profile_id: activeProfileId,
+        question_text: qText.trim(),
+      });
+      setQText('');
+      fetchQuestions();
+    } catch (err) {
+      setQError(String(err));
+    } finally {
+      setQSending(false);
+    }
+  };
 
   if (!activeProfileId) return (
     <div className="flex items-center justify-center h-64">
@@ -383,6 +434,130 @@ export function StudentReviewPage() {
                   </div>
                 </GlassCard>
               )}
+
+              {/* ─── ASK TEACHER Q&A ─────────────────────────────── */}
+              <GlassCard className="p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <MessageCircle size={15} className="text-cyan-400" />
+                    <SectionHeader>Ask Your Teacher</SectionHeader>
+                    {questions.filter(q => q.status === 'PENDING').length > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        {questions.filter(q => q.status === 'PENDING').length} awaiting reply
+                      </span>
+                    )}
+                    {questions.filter(q => q.status === 'ANSWERED').length > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                        {questions.filter(q => q.status === 'ANSWERED').length} answered
+                      </span>
+                    )}
+                  </div>
+                  <button onClick={() => setQaOpen(o => !o)} className="text-slate-500 hover:text-slate-300 transition-colors">
+                    {qaOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  </button>
+                </div>
+
+                <AnimatePresence>
+                  {qaOpen && (
+                    <motion.div
+                      key="qa-panel"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-4 overflow-hidden"
+                    >
+                      {/* Ask question input */}
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-slate-500 font-mono">
+                          Direct message to your teacher — separate from the AI tutor. Teacher will reply below.
+                        </p>
+                        <div className="flex gap-2 items-end">
+                          <textarea
+                            ref={inputRef}
+                            className="flex-1 rounded-xl p-3 text-white text-sm font-mono focus:outline-none resize-none border border-white/10 placeholder-slate-600 focus:border-cyan-500/40 transition-colors"
+                            style={{ background: 'rgba(255,255,255,0.05)', minHeight: '68px' }}
+                            placeholder='e.g. "How do I do the WATER sign correctly?" or "Why does my HELP keep failing?"'
+                            value={qText}
+                            onChange={e => setQText(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                void handleAskTeacher();
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={() => void handleAskTeacher()}
+                            disabled={!qText.trim() || qSending}
+                            className="h-10 w-10 flex items-center justify-center rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white disabled:opacity-40 transition-all shrink-0 mb-0.5"
+                          >
+                            <Send size={15} />
+                          </button>
+                        </div>
+                        {qError && <p className="text-red-400 text-[11px] font-mono">{qError}</p>}
+                        {qSending && <p className="text-cyan-400 text-[11px] font-mono animate-pulse">Sending…</p>}
+                      </div>
+
+                      {/* Q&A thread */}
+                      {questions.length > 0 && (
+                        <div className="space-y-4 border-t border-white/6 pt-3 max-h-96 overflow-y-auto">
+                          {questions.map(q => (
+                            <div key={q.question_id} className="space-y-2">
+                              {/* Student question → right aligned */}
+                              <div className="flex justify-end">
+                                <div
+                                  className="max-w-[88%] rounded-2xl rounded-tr-sm px-4 py-2.5"
+                                  style={{ background: 'rgba(45,226,230,0.08)', border: '1px solid rgba(45,226,230,0.18)' }}
+                                >
+                                  <p className="text-sm text-white leading-relaxed">{q.question_text}</p>
+                                  <div className="flex items-center justify-between gap-3 mt-1">
+                                    <span className="text-[9px] text-slate-600 font-mono">
+                                      {new Date(q.created_at).toLocaleString()}
+                                    </span>
+                                    <span className={`text-[9px] font-mono font-bold uppercase ${
+                                      q.status === 'ANSWERED' ? 'text-emerald-400'
+                                      : q.status === 'DISMISSED' ? 'text-slate-500'
+                                      : 'text-amber-400'
+                                    }`}>
+                                      {q.status === 'ANSWERED' ? '✓ Answered'
+                                       : q.status === 'DISMISSED' ? '— Dismissed'
+                                       : '⏳ Awaiting reply'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Teacher answer → left aligned */}
+                              {q.teacher_answer && (
+                                <div className="flex justify-start">
+                                  <div
+                                    className="max-w-[88%] rounded-2xl rounded-tl-sm px-4 py-2.5"
+                                    style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.22)' }}
+                                  >
+                                    <p className="text-[10px] text-violet-400 font-mono font-bold mb-1 uppercase tracking-wider">Teacher</p>
+                                    <p className="text-sm text-white leading-relaxed">{q.teacher_answer}</p>
+                                    {q.answered_at && (
+                                      <p className="text-[9px] text-slate-600 font-mono mt-1">
+                                        {new Date(q.answered_at).toLocaleString()}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {questions.length === 0 && (
+                        <p className="text-slate-600 text-xs font-mono text-center py-2">
+                          No questions yet — type above to ask your teacher something
+                        </p>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </GlassCard>
             </div>
           </div>
         </>

@@ -1,6 +1,6 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useProfileStore } from '../stores/profileStore';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Radio, BookOpen, GraduationCap, MessageSquare, User,
   Users, Lightbulb, BarChart2,
@@ -59,6 +59,9 @@ export function PrimaryNav() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Unread question count (teachers only) — powers the notification badge on ADD NOTE
+  const [unreadQuestions, setUnreadQuestions] = useState(0);
+
   const navItems = role ? (ROLE_NAV[role] ?? DEFAULT_NAV) : DEFAULT_NAV;
   const accentClass = role ? (ROLE_ACCENT[role] ?? 'border-slate-400 text-slate-400') : 'border-slate-600 text-slate-500';
 
@@ -71,6 +74,20 @@ export function PrimaryNav() {
       navigate(ROLE_HOME[role] ?? '/live', { replace: true });
     }
   }, [role, location.pathname, navItems, navigate]);
+
+  // Poll unanswered question count for teachers
+  useEffect(() => {
+    if (role !== 'TEACHER') return;
+    const fetchCount = () => {
+      fetch('/api/questions/unread-count')
+        .then(r => r.json() as Promise<{ count: number }>)
+        .then(data => setUnreadQuestions(data.count ?? 0))
+        .catch(() => null);
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 30000);
+    return () => clearInterval(interval);
+  }, [role]);
 
   return (
     <nav
@@ -88,7 +105,7 @@ export function PrimaryNav() {
             key={to + label}
             to={to}
             className={({ isActive }) =>
-              `flex items-center gap-1.5 px-4 text-[11px] font-mono font-semibold uppercase tracking-wider transition-colors border-b-2 ${
+              `relative flex items-center gap-1.5 px-4 text-[11px] font-mono font-semibold uppercase tracking-wider transition-colors border-b-2 ${
                 isActive
                   ? `${accentClass} bg-white/5`
                   : 'border-transparent text-slate-500 hover:text-slate-300'
@@ -97,6 +114,15 @@ export function PrimaryNav() {
           >
             {icon}
             {label}
+            {/* Notification badge — ADD NOTE tab for teachers with pending student questions */}
+            {role === 'TEACHER' && to === '/knowledge' && unreadQuestions > 0 && (
+              <span
+                className="absolute top-1 right-1 min-w-[15px] h-[15px] text-[9px] font-bold bg-amber-500 text-zinc-950 rounded-full flex items-center justify-center px-0.5 leading-none"
+                title={`${unreadQuestions} unanswered student question${unreadQuestions !== 1 ? 's' : ''}`}
+              >
+                {unreadQuestions > 9 ? '9+' : unreadQuestions}
+              </span>
+            )}
           </NavLink>
         ))}
       </div>
