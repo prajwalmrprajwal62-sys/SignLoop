@@ -1,15 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 
-// Use require() for adapters since they rely on Node.js net module
-const {
-  startGloveBridge,
-  stopGloveBridge,
-  getGloveBridgeStatus,
-} = require('../adapters/glove_bridge') as typeof import('../adapters/glove_bridge');
-
-const {
-  getSpecsBridgeStatus,
-} = require('../adapters/specs_bridge') as typeof import('../adapters/specs_bridge');
+import { startGloveBridge, stopGloveBridge, getGloveBridgeStatus } from '../adapters/glove_bridge';
+import { getSpecsBridgeStatus } from '../adapters/specs_bridge';
 
 const router = Router();
 

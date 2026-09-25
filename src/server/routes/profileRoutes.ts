@@ -161,4 +161,105 @@ router.get('/:id/contexts', (req: Request<{ id: string }>, res: Response) => {
   }
 });
 
+// GET /api/profiles/:id/summary — rich student performance summary for teacher view
+router.get('/:id/summary', (req: Request<{ id: string }>, res: Response) => {
+  try {
+    const db = getDb();
+    const profile = ProfileService.getById(req.params.id);
+    if (!profile) return res.status(404).json({ ok: false, error: 'Profile not found' });
+
+    // Total sessions
+    const sessionCount = (db.prepare(
+      'SELECT COUNT(*) as count FROM sessions WHERE profile_id = ?'
+    ).get(req.params.id) as { count: number }).count;
+
+    // Session context breakdown
+    const sessionsByContext = db.prepare(`
+      SELECT context, COUNT(*) as count FROM sessions WHERE profile_id = ? GROUP BY context
+    `).all(req.params.id) as Array<{ context: string; count: number }>;
+
+    // Total candidates emitted
+    const candidateCount = (db.prepare(`
+      SELECT COUNT(*) as count FROM candidates c
+      JOIN sessions s ON s.id = c.session_id WHERE s.profile_id = ?
+    `).get(req.params.id) as { count: number }).count;
+
+    // Routing breakdown — how many passed gate vs needed review vs invalid
+    const routingBreakdown = db.prepare(`
+      SELECT c.policy_route, COUNT(*) as count FROM candidates c
+      JOIN sessions s ON s.id = c.session_id WHERE s.profile_id = ?
+      GROUP BY c.policy_route
+    `).all(req.params.id) as Array<{ policy_route: string; count: number }>;
+
+    // Approved outputs (confirmed or corrected gestures)
+    const approvedOutputs = db.prepare(`
+      SELECT ao.final_intent, ao.caption_text, ao.created_at FROM approved_outputs ao
+      JOIN human_decisions hd ON hd.decision_id = ao.decision_id
+      JOIN candidates c ON c.candidate_id = hd.candidate_id
+      JOIN sessions s ON s.id = c.session_id
+      WHERE s.profile_id = ?
+      ORDER BY ao.created_at DESC LIMIT 10
+    `).all(req.params.id) as Array<{ final_intent: string; caption_text: string; created_at: string }>;
+
+    // Most communicated gestures
+    const topGestures = db.prepare(`
+      SELECT ao.final_intent, COUNT(*) as count FROM approved_outputs ao
+      JOIN human_decisions hd ON hd.decision_id = ao.decision_id
+      JOIN candidates c ON c.candidate_id = hd.candidate_id
+      JOIN sessions s ON s.id = c.session_id
+      WHERE s.profile_id = ?
+      GROUP BY ao.final_intent ORDER BY count DESC LIMIT 5
+    `).all(req.params.id) as Array<{ final_intent: string; count: number }>;
+
+    // Gestures that most often needed REVIEW_REQUIRED (struggling with)
+    const reviewRequiredByGesture = db.prepare(`
+      SELECT c.intent_label, COUNT(*) as count FROM candidates c
+      JOIN sessions s ON s.id = c.session_id
+      WHERE s.profile_id = ? AND c.policy_route = 'REVIEW_REQUIRED'
+      GROUP BY c.intent_label ORDER BY count DESC LIMIT 5
+    `).all(req.params.id) as Array<{ intent_label: string; count: number }>;
+
+    // Average model score (only non-null scores)
+    const avgScoreRow = db.prepare(`
+      SELECT AVG(c.score) as avg_score FROM candidates c
+      JOIN sessions s ON s.id = c.session_id
+      WHERE s.profile_id = ? AND c.score IS NOT NULL
+    `).get(req.params.id) as { avg_score: number | null };
+
+    // Teacher notes written for this student
+    const teacherNoteCount = (db.prepare(
+      "SELECT COUNT(*) as count FROM knowledge_sources WHERE profile_id = ? AND source_class = 'TEACHER_KNOWLEDGE'"
+    ).get(req.params.id) as { count: number }).count;
+
+    // Last active timestamp
+    const lastSessionRow = db.prepare(
+      'SELECT started_at FROM sessions WHERE profile_id = ? ORDER BY started_at DESC LIMIT 1'
+    ).get(req.params.id) as { started_at: string } | undefined;
+
+    return res.json({
+      ok: true,
+      summary: {
+        profile,
+        stats: {
+          total_sessions: sessionCount,
+          total_candidates: candidateCount,
+          approved_outputs_count: approvedOutputs.length,
+          teacher_notes_count: teacherNoteCount,
+          avg_model_score: avgScoreRow.avg_score != null
+            ? Math.round(avgScoreRow.avg_score * 100)
+            : null,
+          last_active: lastSessionRow?.started_at ?? null,
+        },
+        sessions_by_context: sessionsByContext,
+        routing_breakdown: routingBreakdown,
+        top_gestures: topGestures,
+        struggling_gestures: reviewRequiredByGesture,
+        recent_outputs: approvedOutputs,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
 export default router;

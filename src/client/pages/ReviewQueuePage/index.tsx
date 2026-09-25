@@ -99,7 +99,7 @@ export function ReviewQueuePage() {
         author_id: activeProfileId,
         author_role: 'TEACHER',
         content: noteText.trim(),
-        content_type: 'text/plain',
+        content_type: 'CORRECTION',
         locale: 'en-IN',
         consent_scope: selected.context ?? 'LEARNING_PRACTICE',
         retention_class: 'PERMANENT_AUDIT',

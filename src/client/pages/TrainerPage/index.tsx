@@ -7,7 +7,7 @@ import { useProfileStore } from '../../stores/profileStore';
 import { apiGet, apiPost } from '../../api/client';
 import {
   Users, AlertTriangle, CheckCircle, ChevronRight,
-  FileText, Save, BookOpen, Zap, Lightbulb,
+  FileText, Save, BookOpen, Zap, Lightbulb, TrendingUp, TrendingDown, Activity,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -35,6 +35,23 @@ interface FollowUpCase {
   intent_id: string;
   correction_reason: string;
   status: string;
+}
+
+interface StudentSummary {
+  profile: StudentProfile;
+  stats: {
+    total_sessions: number;
+    total_candidates: number;
+    approved_outputs_count: number;
+    teacher_notes_count: number;
+    avg_model_score: number | null;
+    last_active: string | null;
+  };
+  sessions_by_context: Array<{ context: string; count: number }>;
+  routing_breakdown: Array<{ policy_route: string; count: number }>;
+  top_gestures: Array<{ final_intent: string; count: number }>;
+  struggling_gestures: Array<{ intent_label: string; count: number }>;
+  recent_outputs: Array<{ final_intent: string; caption_text: string; created_at: string }>;
 }
 
 const GESTURE_EMOJI: Record<string, string> = {
@@ -67,6 +84,7 @@ export function TrainerPage() {
   const [studentTasks, setStudentTasks] = useState<PracticeTask[]>([]);
   const [followUps, setFollowUps] = useState<FollowUpCase[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [studentSummary, setStudentSummary] = useState<StudentSummary | null>(null);
 
   // Note editor
   const [noteIntent, setNoteIntent] = useState('HELP');
@@ -91,9 +109,10 @@ export function TrainerPage() {
       .finally(() => setLoadingStudents(false));
   }, []);
 
-  // Load selected student's tasks and follow-ups
+  // Load selected student's tasks, follow-ups, and performance summary
   useEffect(() => {
     if (!selectedStudent) return;
+    setStudentSummary(null);
     apiGet<{ ok: boolean; tasks: PracticeTask[] }>(
       `/api/practice/tasks?profile_id=${selectedStudent.id}`
     ).then(res => setStudentTasks(res.tasks ?? [])).catch(console.error);
@@ -101,6 +120,10 @@ export function TrainerPage() {
     apiGet<{ ok: boolean; followUps: FollowUpCase[] }>(
       `/api/practice/followups?profile_id=${selectedStudent.id}`
     ).then(res => setFollowUps(res.followUps ?? [])).catch(console.error);
+
+    apiGet<{ ok: boolean; summary: StudentSummary }>(
+      `/api/profiles/${selectedStudent.id}/summary`
+    ).then(res => setStudentSummary(res.summary ?? null)).catch(console.error);
   }, [selectedStudent]);
 
   const handleSaveNote = async () => {
@@ -115,7 +138,7 @@ export function TrainerPage() {
         author_id: activeProfileId,
         author_role: 'TEACHER',
         content: noteText.trim(),
-        content_type: 'text/plain',
+        content_type: 'INSTRUCTION',
         locale: 'en-IN',
         consent_scope: contextType ?? 'LEARNING_PRACTICE',
         retention_class: 'PERMANENT_AUDIT',
@@ -212,29 +235,103 @@ export function TrainerPage() {
               )}
             </div>
 
-            {/* Selected student detail */}
+            {/* Selected student detail — full performance summary */}
             <div className="col-span-8 space-y-4">
               {selectedStudent ? (
                 <>
+                  {/* Header card */}
                   <GlassCard className="p-5">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-xl bg-violet-400/15 border border-violet-400/30 flex items-center justify-center">
-                        <span className="text-violet-400 font-bold text-sm font-mono">
-                          {selectedStudent.pseudonymous_code.slice(0, 2)}
-                        </span>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-violet-400/15 border border-violet-400/30 flex items-center justify-center">
+                          <span className="text-violet-400 font-bold text-base font-mono">
+                            {selectedStudent.pseudonymous_code.slice(0, 2)}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-bold text-white font-mono text-lg">{selectedStudent.pseudonymous_code}</p>
+                          <p className="text-slate-500 text-xs">{selectedStudent.preferred_locale} · STUDENT</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-white font-mono">{selectedStudent.pseudonymous_code}</p>
-                        <p className="text-slate-500 text-xs">{selectedStudent.preferred_locale} · STUDENT</p>
-                      </div>
+                      <button
+                        onClick={() => { setNoteTargetStudent(selectedStudent.id); setTab('note'); }}
+                        className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all flex items-center gap-1.5"
+                      >
+                        <FileText size={12} /> Add Note
+                      </button>
                     </div>
+
+                    {/* Stats row */}
+                    {studentSummary ? (
+                      <div className="grid grid-cols-3 gap-3 mb-4">
+                        {[
+                          { label: 'Sessions', value: studentSummary.stats.total_sessions, icon: <Activity size={12} className="text-cyan-400" /> },
+                          { label: 'Gestures sent', value: studentSummary.stats.total_candidates, icon: <Zap size={12} className="text-amber-400" /> },
+                          { label: 'Approved', value: studentSummary.stats.approved_outputs_count, icon: <CheckCircle size={12} className="text-emerald-400" /> },
+                          { label: 'Avg model score', value: studentSummary.stats.avg_model_score != null ? `${studentSummary.stats.avg_model_score}%` : '—', icon: <TrendingUp size={12} className="text-violet-400" /> },
+                          { label: 'Teacher notes', value: studentSummary.stats.teacher_notes_count, icon: <FileText size={12} className="text-violet-400" /> },
+                          { label: 'Last active', value: studentSummary.stats.last_active ? new Date(studentSummary.stats.last_active).toLocaleDateString() : 'Never', icon: <Lightbulb size={12} className="text-slate-400" /> },
+                        ].map(s => (
+                          <div key={s.label} className="rounded-xl border border-white/6 p-3" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                            <div className="flex items-center gap-1 mb-1">{s.icon}<span className="text-[10px] text-slate-500 font-mono uppercase">{s.label}</span></div>
+                            <span className="text-white font-bold text-base">{String(s.value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-slate-600 text-xs font-mono animate-pulse mb-4">Loading summary…</p>
+                    )}
+
+                    {/* Gestures doing well vs struggling */}
+                    {studentSummary && (
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div>
+                          <div className="flex items-center gap-1 mb-2">
+                            <TrendingUp size={12} className="text-emerald-400" />
+                            <span className="text-[10px] text-slate-400 font-mono uppercase">Top gestures</span>
+                          </div>
+                          {studentSummary.top_gestures.length === 0 ? (
+                            <p className="text-slate-600 text-xs font-mono">No data yet</p>
+                          ) : (
+                            <div className="space-y-1">
+                              {studentSummary.top_gestures.map(g => (
+                                <div key={g.final_intent} className="flex items-center gap-2 text-xs">
+                                  <span className="text-base">{GESTURE_EMOJI[g.final_intent] ?? '👋'}</span>
+                                  <span className="text-white font-mono flex-1">{g.final_intent}</span>
+                                  <span className="text-emerald-400 font-mono">{g.count}×</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1 mb-2">
+                            <TrendingDown size={12} className="text-amber-400" />
+                            <span className="text-[10px] text-slate-400 font-mono uppercase">Needs review</span>
+                          </div>
+                          {studentSummary.struggling_gestures.length === 0 ? (
+                            <p className="text-slate-600 text-xs font-mono">No issues found</p>
+                          ) : (
+                            <div className="space-y-1">
+                              {studentSummary.struggling_gestures.map(g => (
+                                <div key={g.intent_label} className="flex items-center gap-2 text-xs">
+                                  <span className="text-base">{GESTURE_EMOJI[g.intent_label] ?? '👋'}</span>
+                                  <span className="text-white font-mono flex-1">{g.intent_label}</span>
+                                  <span className="text-amber-400 font-mono">{g.count} reviews</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Practice tasks */}
                     <SectionHeader className="mb-3">Assigned Practice Tasks</SectionHeader>
                     {studentTasks.length === 0 ? (
                       <p className="text-slate-600 text-xs font-mono">No tasks assigned yet.</p>
                     ) : (
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {studentTasks.map(task => (
                           <div
                             key={task.task_id}
@@ -249,7 +346,6 @@ export function TrainerPage() {
                             {task.instruction && (
                               <p className="text-slate-400 text-xs italic mb-2">"{task.instruction}"</p>
                             )}
-                            {/* Progress bar */}
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-1.5 rounded-full bg-slate-700 overflow-hidden">
                                 <div
@@ -267,24 +363,24 @@ export function TrainerPage() {
                     )}
                   </GlassCard>
 
-                  {/* Direct to dedicated note editor — no duplication */}
-                  <div className="rounded-xl border border-violet-400/15 p-4 flex items-center gap-3"
-                    style={{ background: 'rgba(139,92,246,0.06)' }}>
-                    <FileText size={14} className="text-violet-400 shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-violet-300 text-sm font-semibold">Add a note for {selectedStudent.pseudonymous_code}</p>
-                      <p className="text-slate-500 text-xs mt-0.5">
-                        Go to <span className="text-white font-mono">ADD NOTE</span> tab to write an instruction.
-                        Notes are student-specific and feed directly into their RAG tutor.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => { setNoteTargetStudent(selectedStudent.id); setTab('note'); }}
-                      className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all shrink-0"
-                    >
-                      Add Note →
-                    </button>
-                  </div>
+                  {/* Recent approved outputs */}
+                  {studentSummary && studentSummary.recent_outputs.length > 0 && (
+                    <GlassCard className="p-5">
+                      <SectionHeader className="mb-3">Recent Approved Communications</SectionHeader>
+                      <div className="space-y-2">
+                        {studentSummary.recent_outputs.slice(0, 5).map((o, i) => (
+                          <div key={i} className="flex items-center gap-3 text-sm">
+                            <span className="text-xl">{GESTURE_EMOJI[o.final_intent] ?? '👋'}</span>
+                            <div className="flex-1">
+                              <span className="font-bold text-white uppercase text-xs">{o.final_intent}</span>
+                              <p className="text-slate-400 text-xs italic">"{o.caption_text}"</p>
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-600">{new Date(o.created_at).toLocaleTimeString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </GlassCard>
+                  )}
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center h-48 text-center">

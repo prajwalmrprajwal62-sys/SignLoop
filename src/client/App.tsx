@@ -12,7 +12,7 @@ import { ProfilePage } from './pages/ProfilePage';
 
 export function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Toaster
         theme="dark"
         position="top-right"

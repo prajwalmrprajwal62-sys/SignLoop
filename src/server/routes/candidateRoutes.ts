@@ -3,6 +3,7 @@ import { RoutingService } from '../services/RoutingService';
 import { DecisionService } from '../services/DecisionService';
 import { SessionService } from '../services/SessionService';
 import { TeacherKnowledgeService } from '../services/TeacherKnowledgeService';
+import { getDb } from '../db/connection';
 import type { DecisionAction } from '../../shared/types/decisions';
 
 const router = Router();
@@ -94,7 +95,6 @@ router.get('/:id/decisions', (req: Request<{ id: string }>, res: Response) => {
 // Teacher→Student connection: student gesture below 75% → appears here for teacher review
 router.get('/teacher/review-queue', (_req: Request, res: Response) => {
   try {
-    const { getDb } = require('../db/connection') as { getDb: () => import('better-sqlite3').Database };
     const database = getDb();
 
     // Join candidates → sessions → profiles to get full context
