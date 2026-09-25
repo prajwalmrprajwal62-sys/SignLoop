@@ -1,9 +1,24 @@
 // GeminiService.ts — Gemini-powered synthesis for the RAG tutor
-// Uses gemini-2.0-flash-lite for speed/cost efficiency in the tutor loop.
+// Uses gemini-2.5-flash for speed/cost efficiency in the tutor loop.
 // Falls back gracefully when GEMINI_API_KEY is not set.
-// Called AFTER retrieval — Gemini synthesizes retrieved knowledge into a natural answer.
 
+import { createRequire } from 'module';
 import type { RetrievalResult } from '../../shared/types/retrieval';
+
+const _require = createRequire(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+const { GoogleGenerativeAI } = _require('@google/generative-ai') as typeof import('@google/generative-ai');
+
+type GenAIClient = InstanceType<typeof GoogleGenerativeAI>;
+let genAIClient: GenAIClient | null = null;
+
+function getClient(): GenAIClient | null {
+  if (genAIClient) return genAIClient;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) return null;
+  genAIClient = new GoogleGenerativeAI(apiKey);
+  return genAIClient;
+}
 
 export interface GeminiSynthesisParams {
   queryText: string;
@@ -27,8 +42,8 @@ export class GeminiService {
   }
 
   static async synthesize(params: GeminiSynthesisParams): Promise<GeminiSynthesisResult> {
-    const apiKey = process.env.GEMINI_API_KEY?.trim();
-    if (!apiKey) {
+    const client = getClient();
+    if (!client) {
       return {
         answer_text: GeminiService.buildTemplateFallback(params),
         used_gemini: false,
@@ -37,10 +52,7 @@ export class GeminiService {
     }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { GoogleGenerativeAI } = require('@google/generative-ai') as typeof import('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+      const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
       const prompt = GeminiService.buildPrompt(params);
       const result = await model.generateContent(prompt);
