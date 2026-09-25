@@ -1,6 +1,8 @@
+import 'dotenv/config'; // Load .env before anything else
 import { Router, type Request, type Response } from 'express';
 import { RetrievalService } from '../services/RetrievalService';
 import { GroundingValidator } from '../services/GroundingValidator';
+import { ClaudeService } from '../services/ClaudeService';
 import { getDb } from '../db/connection';
 import type { TutorQueryType } from '../../shared/types/retrieval';
 import type { TutorResponse } from '../../shared/types/retrieval';
@@ -31,8 +33,8 @@ router.post('/retrieval/run', (req: Request, res: Response) => {
   }
 });
 
-// POST /api/tutor/respond — generate grounded tutor response
-router.post('/tutor/respond', (req: Request, res: Response) => {
+// POST /api/tutor/respond — generate grounded tutor response (with Claude synthesis)
+router.post('/tutor/respond', async (req: Request, res: Response) => {
   try {
     const {
       profile_id, context, role, consent_granted,
@@ -45,7 +47,7 @@ router.post('/tutor/respond', (req: Request, res: Response) => {
       return res.status(400).json({ ok: false, error: 'profile_id, context, query_type required' });
     }
 
-    // Step 1: Retrieve
+    // Step 1: Retrieve from knowledge base (FTS5 + intent fallback)
     const { results, retrievalId } = RetrievalService.retrieve({
       profileId: profile_id, context, role: role ?? 'STUDENT',
       consentGranted: consent_granted ?? false,
@@ -55,7 +57,47 @@ router.post('/tutor/respond', (req: Request, res: Response) => {
       sessionId: session_id,
     });
 
-    // Step 2: Validate grounding
+    // Step 2: Load student context for personalization (struggling / strong gestures)
+    const db = getDb();
+    let strugglingGestures: string[] = [];
+    let strongGestures: string[] = [];
+    try {
+      const struggling = db.prepare(`
+        SELECT intent_label
+        FROM quality_checks
+        WHERE profile_id = ? AND gate_result = 'REVIEW_REQUIRED'
+        GROUP BY intent_label
+        ORDER BY COUNT(*) DESC
+        LIMIT 3
+      `).all(profile_id) as Array<{ intent_label: string }>;
+      strugglingGestures = struggling.map(r => r.intent_label);
+
+      const strong = db.prepare(`
+        SELECT intent_label
+        FROM quality_checks
+        WHERE profile_id = ? AND gate_result = 'PASSED'
+        GROUP BY intent_label
+        ORDER BY COUNT(*) DESC
+        LIMIT 3
+      `).all(profile_id) as Array<{ intent_label: string }>;
+      strongGestures = strong.map(r => r.intent_label);
+    } catch {
+      // Non-critical — proceed without personalization context
+    }
+
+    // Step 3: Synthesize answer
+    // Try Claude first — falls back to template if no API key or error
+    const synthesis = await ClaudeService.synthesize({
+      queryText: query_text ?? '',
+      queryType: query_type,
+      intentId: intent_id,
+      retrievedSources: results,
+      hasGrounding: results.length > 0,
+      strugglingGestures,
+      strongGestures,
+    });
+
+    // Step 4: Determine final status (use GroundingValidator for status classification)
     const run = RetrievalService.getRunById(retrievalId) as { status: string } | undefined;
     const hasConflict = run?.status === 'CONFLICT';
     const validation = GroundingValidator.validate({
@@ -65,21 +107,26 @@ router.post('/tutor/respond', (req: Request, res: Response) => {
       intentId: intent_id,
     });
 
-    // Step 3: Persist tutor response
-    const db = getDb();
+    // Override answer_text with Claude's if available and better
+    const finalAnswerText = synthesis.answer_text || validation.answer_text;
+    const finalStatus = synthesis.grounding_level === 'GENERAL_KNOWLEDGE'
+      ? 'GROUNDED'  // Claude answered from general knowledge — still a valid answer
+      : validation.status;
+
+    // Step 5: Persist tutor response
     const now = new Date().toISOString();
     const responseId = crypto.randomUUID();
     const tutorResponse: TutorResponse = {
       response_id: responseId,
       retrieval_id: retrievalId,
       answer_type: query_type,
-      answer_text: validation.answer_text,
+      answer_text: finalAnswerText,
       recommended_action: null,
       source_ids_json: JSON.stringify(validation.source_ids),
       evidence_window: null,
-      retrieval_status: validation.status,
-      abstention_reason: validation.abstention_reason,
-      policy_version: 'rag-policy-v1',
+      retrieval_status: finalStatus as TutorResponse['retrieval_status'],
+      abstention_reason: synthesis.grounding_level === 'FALLBACK' ? validation.abstention_reason : null,
+      policy_version: synthesis.used_claude ? 'claude-rag-v1' : 'rag-policy-v1',
       index_version: 'local-fts-v1',
       created_at: now,
     };
@@ -115,4 +162,3 @@ router.get('/tutor/responses/:id', (req: Request<{ id: string }>, res: Response)
 });
 
 export default router;
-

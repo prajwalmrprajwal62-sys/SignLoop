@@ -98,7 +98,8 @@ router.get('/unread-count', (_req: Request, res: Response) => {
 });
 
 // ─── PATCH /api/questions/:id/answer ─────────────────────────────────────
-// Teacher answers a question
+// Teacher answers a question — also auto-indexes the Q&A into knowledge_sources
+// so the RAG tutor learns from every teacher answer.
 router.patch('/:id/answer', (req: Request<{ id: string }>, res: Response) => {
   try {
     const { teacher_answer, answered_by } = req.body as {
@@ -112,11 +113,47 @@ router.patch('/:id/answer', (req: Request<{ id: string }>, res: Response) => {
     const existing = db.prepare('SELECT * FROM student_questions WHERE question_id = ?').get(req.params.id) as StudentQuestion | undefined;
     if (!existing) return res.status(404).json({ ok: false, error: 'Question not found' });
 
+    const now = new Date().toISOString();
+
+    // 1. Save the answer to the question
     db.prepare(`
       UPDATE student_questions
       SET status = 'ANSWERED', teacher_answer = ?, answered_by = ?, answered_at = ?
       WHERE question_id = ?
-    `).run(teacher_answer.trim(), answered_by, new Date().toISOString(), req.params.id);
+    `).run(teacher_answer.trim(), answered_by, now, req.params.id);
+
+    // 2. Auto-index this Q&A into knowledge_sources so the RAG tutor learns from it.
+    //    Stored as TEACHER_KNOWLEDGE (approved immediately) — globally available to all students
+    //    but tagged with the student's profile_id so personalized retrieval ranks it higher.
+    try {
+      const knowledgeContent =
+        `Q: ${existing.question_text.trim()} — A: ${teacher_answer.trim()}`;
+
+      db.prepare(`
+        INSERT INTO knowledge_sources (
+          source_id, source_class, profile_id, context, intent_id, task_id,
+          author_id, author_role, source_title, content, content_type, locale,
+          status, version, supersedes_id, session_id, event_id,
+          consent_scope, retention_class, created_at, updated_at
+        ) VALUES (
+          ?, 'TEACHER_KNOWLEDGE', ?, 'LEARNING_PRACTICE', ?, NULL,
+          ?, 'TEACHER', ?, ?, 'INSTRUCTION', 'en-IN',
+          'APPROVED', 1, NULL, NULL, NULL,
+          'LEARNING_PRACTICE', 'PERMANENT_AUDIT', ?, ?
+        )
+      `).run(
+        crypto.randomUUID(),
+        existing.profile_id,          // student's profile — personalization weight
+        existing.intent_id ?? null,    // gesture context if any
+        answered_by,                   // teacher's profile_id as author
+        `Teacher Q&A: ${existing.question_text.trim().slice(0, 80)}`, // title
+        knowledgeContent,              // "Q: ... — A: ..." for FTS5
+        now, now,
+      );
+    } catch (indexErr) {
+      // Non-fatal: answer is saved even if indexing fails
+      console.warn('[questionRoutes] Failed to index Q&A into knowledge_sources:', indexErr);
+    }
 
     const updated = db.prepare('SELECT * FROM student_questions WHERE question_id = ?').get(req.params.id) as StudentQuestion;
     return res.json({ ok: true, question: updated });
