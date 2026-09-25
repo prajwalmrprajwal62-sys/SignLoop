@@ -1,3 +1,4 @@
+import ReactMarkdown from 'react-markdown';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProvenanceChip } from '../common/ProvenanceChip';
 import { AbstentionCard } from './AbstentionCard';
@@ -10,6 +11,35 @@ interface TutorResponseData {
   source_ids_json: string;
   retrieval_status: string;
   abstention_reason: string | null;
+}
+
+/** Shared markdown renderer — renders **bold**, numbered lists, emoji correctly */
+function MarkdownAnswer({ text, className }: { text: string; className?: string }) {
+  return (
+    <div className={`prose prose-invert prose-xs max-w-none ${className ?? ''}`}>
+      <ReactMarkdown
+        components={{
+          p: ({ children }) => (
+            <p className="text-xs text-zinc-200 leading-relaxed mb-1.5 last:mb-0">{children}</p>
+          ),
+          strong: ({ children }) => (
+            <strong className="text-violet-300 font-semibold">{children}</strong>
+          ),
+          ol: ({ children }) => (
+            <ol className="list-decimal list-inside space-y-1 text-xs text-zinc-200">{children}</ol>
+          ),
+          ul: ({ children }) => (
+            <ul className="list-disc list-inside space-y-1 text-xs text-zinc-200">{children}</ul>
+          ),
+          li: ({ children }) => (
+            <li className="leading-relaxed">{children}</li>
+          ),
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 export function TutorResponseView({ response, compact }: { response: TutorResponseData; compact?: boolean }) {
@@ -33,7 +63,7 @@ export function TutorResponseView({ response, compact }: { response: TutorRespon
           <StatusBadge status={response.retrieval_status} size="xs" />
           <span className="text-[10px] font-mono text-zinc-600">{response.answer_type}</span>
         </div>
-        <p className="text-xs text-zinc-200 leading-relaxed">{response.answer_text}</p>
+        <MarkdownAnswer text={response.answer_text} />
         {sourceIds.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-0.5">
             <span className="text-[9px] font-mono text-zinc-600 mr-1">Sources:</span>
@@ -52,7 +82,7 @@ export function TutorResponseView({ response, compact }: { response: TutorRespon
         <StatusBadge status={response.retrieval_status} size="xs" />
         <span className="text-[10px] font-mono text-zinc-500">RAG • {response.answer_type}</span>
       </div>
-      <p className="text-sm text-zinc-200 leading-relaxed">{response.answer_text}</p>
+      <MarkdownAnswer text={response.answer_text} />
       {sourceIds.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pt-1">
           <span className="text-[10px] font-mono text-zinc-500 mr-1">Sources:</span>

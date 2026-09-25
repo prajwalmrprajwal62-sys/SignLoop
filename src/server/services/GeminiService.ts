@@ -87,52 +87,68 @@ export class GeminiService {
   private static buildPrompt(params: GeminiSynthesisParams): string {
     const lines: string[] = [];
 
-    lines.push('You are an expert sign language tutor assistant for SignLoop, helping students learn Indian Sign Language (ISL).');
-    lines.push('Answer in 2–4 clear, practical, encouraging sentences. Be specific about technique. Do not say "I" repeatedly.');
+    // System role + STRICT formatting instructions
+    lines.push('You are an expert Sign Language tutor for SignLoop, helping students learn Indian Sign Language (ISL).');
+    lines.push('');
+    lines.push('STRICT OUTPUT FORMAT — You MUST follow these rules exactly:');
+    lines.push('1. Use **bold** (double asterisks) for all key terms, gesture names, hand positions, and important instructions.');
+    lines.push('2. Use numbered steps (1., 2., 3.) for any sequence or technique. Never write a wall of text.');
+    lines.push('3. Start each major section with a relevant emoji. Use these emojis:');
+    lines.push('   🤚 for hand position/shape');
+    lines.push('   👆 for finger placement');
+    lines.push('   🔄 for movement/motion');
+    lines.push('   ⚠️ for common mistakes');
+    lines.push('   💡 for tips/advice');
+    lines.push('   ✅ for correct technique');
+    lines.push('   📍 for location/placement');
+    lines.push('   🎯 for practice goal');
+    lines.push('4. Keep the total response under 150 words. Be concise and specific.');
+    lines.push('5. End with one short encouraging sentence using ✨.');
+    lines.push('6. Do NOT use paragraphs. Use only numbered steps and emoji-prefixed lines.');
 
     if (params.retrievedSources.length > 0) {
       lines.push('');
-      lines.push('Use only the following knowledge base to answer. Do not add information not present below:');
+      lines.push('KNOWLEDGE BASE — Use ONLY this content. Do not add anything not present here:');
       params.retrievedSources.forEach((s, i) => {
-        lines.push(`[${i + 1}] ${s.content}`);
+        lines.push(`[Source ${i + 1}]: ${s.content}`);
       });
-    } else {
-      lines.push('');
-      lines.push('No specific notes found in the knowledge base. Answer from general ISL / sign language knowledge. If unsure about a specific technique, say so honestly and suggest the student ask their teacher in the "Ask Your Teacher" section of their Review page.');
     }
 
     if (params.strugglingGestures?.length) {
       lines.push('');
-      lines.push(`Note: This student struggles with: ${params.strugglingGestures.join(', ')}. Keep this in mind to personalize advice.`);
+      lines.push(`PERSONALIZATION: This student struggles with **${params.strugglingGestures.join('**, **')}**. Address these specifically if relevant.`);
     }
     if (params.strongGestures?.length) {
-      lines.push(`This student is strong at: ${params.strongGestures.join(', ')}.`);
+      lines.push(`This student is already strong at: ${params.strongGestures.join(', ')}. Build on their strengths.`);
     }
 
     lines.push('');
     lines.push('---');
+    lines.push('STUDENT QUESTION:');
 
     // Build the user question based on query type
-    const intent = params.intentId ? ` the ${params.intentId} sign` : ' this sign';
+    const intent = params.intentId ? ` the **${params.intentId}** sign` : ' this sign';
     switch (params.queryType) {
       case 'SHOW_REFERENCE':
-        lines.push(`Student wants to know: How do I correctly perform${intent}?`);
+        lines.push(`How do I correctly perform${intent}? Give me step-by-step technique with hand position, movement, and common mistakes.`);
         break;
       case 'WHY_TASK':
-        lines.push(`Student asks: ${params.queryText || `Why am I practicing${intent}?`}`);
+        lines.push(params.queryText
+          ? `${params.queryText} — Answer using step-by-step format with emojis.`
+          : `Why am I practicing${intent}? What should I focus on?`);
         break;
       case 'WHAT_NEXT':
-        lines.push(`Student asks: What should I practice next?`);
+        lines.push(`What should I practice next to improve${intent}?`);
         break;
       case 'PROGRESS':
         lines.push(`Student asks: How is my progress going?`);
         break;
       default:
-        lines.push(`Student asks: ${params.queryText || `Tell me about${intent}.`}`);
+        lines.push(`${params.queryText || `Tell me about${intent}.`} — Use step-by-step format with emojis and bold key terms.`);
     }
 
     lines.push('');
-    lines.push('Give a direct, helpful answer:');
+    lines.push('Answer now using the format rules above (emojis, numbered steps, **bold** key terms, under 150 words):');
 
     return lines.join('\n');
   }
@@ -141,14 +157,14 @@ export class GeminiService {
   static buildTemplateFallback(params: GeminiSynthesisParams): string {
     if (params.retrievedSources.length === 0) {
       const label = params.queryText || (params.intentId ?? 'this gesture');
-      return `I don't have specific notes on "${label}" yet. Try asking in the Ask Your Teacher section of your Review page — your teacher's answer will automatically train the tutor for future questions.`;
+      return `💡 **No notes found yet** for "${label}".\n\n🎯 **Next step:** Head to **My Review → Ask Your Teacher** to send a question. Your teacher's answer will automatically train the tutor for future students!`;
     }
 
     const top = params.retrievedSources[0]?.content ?? '';
     switch (params.queryType) {
-      case 'SHOW_REFERENCE': return top;
-      case 'WHY_TASK': return `About ${params.intentId ?? 'this gesture'}: ${top}`;
-      case 'WHAT_NEXT': return `Next focus: ${top}`;
+      case 'SHOW_REFERENCE': return `✅ **Technique — ${params.intentId ?? 'Sign'}:**\n\n${top}`;
+      case 'WHY_TASK': return `🎯 **About ${params.intentId ?? 'this gesture'}:**\n\n${top}`;
+      case 'WHAT_NEXT': return `📍 **Next focus:**\n\n${top}`;
       default: return top;
     }
   }
