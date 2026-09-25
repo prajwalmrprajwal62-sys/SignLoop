@@ -18,7 +18,7 @@ router.get('/status/:profileId', (req: Request<{ profileId: string }>, res: Resp
   }
 });
 
-// GET /api/privacy/export/:profileId — export all profile data as JSON (read-only)
+// GET /api/privacy/export/:profileId — export all profile data (flattened for frontend)
 router.get('/export/:profileId', (req: Request<{ profileId: string }>, res: Response) => {
   try {
     const db = getDb();
@@ -36,25 +36,36 @@ router.get('/export/:profileId', (req: Request<{ profileId: string }>, res: Resp
       JOIN sessions s ON s.id = c.session_id
       WHERE s.profile_id = ?
     `).all(req.params.profileId);
+    const approved_outputs = db.prepare(`
+      SELECT ao.* FROM approved_outputs ao
+      JOIN human_decisions hd ON hd.decision_id = ao.decision_id
+      JOIN candidates c ON c.candidate_id = hd.candidate_id
+      JOIN sessions s ON s.id = c.session_id
+      WHERE s.profile_id = ?
+    `).all(req.params.profileId);
     const tasks = db.prepare('SELECT * FROM practice_tasks WHERE profile_id = ?').all(req.params.profileId);
+    const events_count_row = db.prepare(
+      'SELECT COUNT(*) as count FROM events WHERE profile_id = ?'
+    ).get(req.params.profileId) as { count: number } | undefined;
+    // Return flat (not nested under 'export') — frontend reads res.profile, res.sessions, etc.
     return res.json({
       ok: true,
-      export: {
-        profile,
-        sessions,
-        candidates,
-        decisions,
-        tasks,
-        exported_at: new Date().toISOString(),
-        notice: 'SAVED_LOCALLY — data stored in local SQLite database only.',
-      },
+      profile,
+      sessions,
+      candidates,
+      decisions,
+      approved_outputs,
+      tasks,
+      events_count: events_count_row?.count ?? 0,
+      exported_at: new Date().toISOString(),
+      notice: 'SAVED_LOCALLY — data stored in local SQLite database only.',
     });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
   }
 });
 
-// POST /api/privacy/export/:profileId
+// POST /api/privacy/export/:profileId — same as GET version
 router.post('/export/:profileId', (req: Request<{ profileId: string }>, res: Response) => {
   try {
     const db = getDb();
@@ -72,18 +83,28 @@ router.post('/export/:profileId', (req: Request<{ profileId: string }>, res: Res
       JOIN sessions s ON s.id = c.session_id
       WHERE s.profile_id = ?
     `).all(req.params.profileId);
+    const approved_outputs = db.prepare(`
+      SELECT ao.* FROM approved_outputs ao
+      JOIN human_decisions hd ON hd.decision_id = ao.decision_id
+      JOIN candidates c ON c.candidate_id = hd.candidate_id
+      JOIN sessions s ON s.id = c.session_id
+      WHERE s.profile_id = ?
+    `).all(req.params.profileId);
     const tasks = db.prepare('SELECT * FROM practice_tasks WHERE profile_id = ?').all(req.params.profileId);
+    const events_count_row = db.prepare(
+      'SELECT COUNT(*) as count FROM events WHERE profile_id = ?'
+    ).get(req.params.profileId) as { count: number } | undefined;
     return res.json({
       ok: true,
-      export: {
-        profile,
-        sessions,
-        candidates,
-        decisions,
-        tasks,
-        exported_at: new Date().toISOString(),
-        notice: 'SAVED_LOCALLY — data stored in local SQLite database only.',
-      },
+      profile,
+      sessions,
+      candidates,
+      decisions,
+      approved_outputs,
+      tasks,
+      events_count: events_count_row?.count ?? 0,
+      exported_at: new Date().toISOString(),
+      notice: 'SAVED_LOCALLY — data stored in local SQLite database only.',
     });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });

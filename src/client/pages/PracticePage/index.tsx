@@ -5,7 +5,7 @@ import { GlassCard } from '../../components/common/GlassCard';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { useProfileStore } from '../../stores/profileStore';
 import { apiGet } from '../../api/client';
-import { Target, ChevronRight, BookOpen } from 'lucide-react';
+import { Target, ChevronRight, BookOpen, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface PracticeTask {
@@ -41,12 +41,21 @@ const PRIORITY_COLORS = {
   LOW:    'text-emerald-400 border-emerald-400/30 bg-emerald-400/10',
 };
 
+interface TeacherMessage {
+  source_id: string;
+  intent_id: string | null;
+  content: string;
+  author_id: string | null;
+  created_at: string;
+}
+
 export function PracticePage() {
   const { activeProfileId, role, contextType } = useProfileStore();
   const [tasks, setTasks] = useState<PracticeTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showTutor, setShowTutor] = useState(false);
+  const [teacherMessages, setTeacherMessages] = useState<TeacherMessage[]>([]);
 
   useEffect(() => {
     if (!activeProfileId) return;
@@ -55,6 +64,20 @@ export function PracticePage() {
       .then(res => setTasks(res.tasks ?? []))
       .catch(err => setError(String(err)))
       .finally(() => setLoading(false));
+  }, [activeProfileId]);
+
+  // Fetch teacher-authored knowledge sources for this student
+  useEffect(() => {
+    if (!activeProfileId) return;
+    apiGet<{ ok: boolean; sources: TeacherMessage[] }>(`/api/knowledge/sources?profile_id=${activeProfileId}`)
+      .then(res => {
+        // Filter to TEACHER_KNOWLEDGE source_class on the client side
+        const notes = (res.sources ?? []).filter(
+          (s: TeacherMessage & { source_class?: string }) => s.source_class === 'TEACHER_KNOWLEDGE'
+        );
+        setTeacherMessages(notes);
+      })
+      .catch(() => setTeacherMessages([]));
   }, [activeProfileId]);
 
   const activeTask = tasks[0] ?? null;
@@ -260,6 +283,46 @@ export function PracticePage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Teacher Messages */}
+      <div className="rounded-2xl border-2 border-violet-500/30">
+        <GlassCard className="p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <MessageCircle size={16} className="text-violet-400" />
+          <SectionHeader>Teacher Messages</SectionHeader>
+        </div>
+        {teacherMessages.length === 0 ? (
+          <p className="text-slate-500 text-sm font-mono">No teacher messages yet</p>
+        ) : (
+          <div className="space-y-3">
+            {teacherMessages.map(msg => (
+              <div
+                key={msg.source_id}
+                className="rounded-xl border border-violet-500/20 p-4"
+                style={{ background: 'rgba(139,92,246,0.05)' }}
+              >
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  {msg.intent_id && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase bg-violet-500/15 text-violet-300 border border-violet-500/20">
+                      {msg.intent_id}
+                    </span>
+                  )}
+                  {msg.author_id && (
+                    <span className="text-[10px] font-mono text-slate-500">
+                      by {msg.author_id}
+                    </span>
+                  )}
+                  <span className="text-[10px] font-mono text-slate-600 ml-auto">
+                    {new Date(msg.created_at).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-slate-200 text-sm leading-relaxed">{msg.content}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        </GlassCard>
       </div>
     </div>
   );

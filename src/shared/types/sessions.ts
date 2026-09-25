@@ -12,6 +12,7 @@ export type Provenance = typeof Provenance[keyof typeof Provenance];
 export const SourceType = {
   GLOVE: 'GLOVE',
   CAMERA: 'CAMERA',
+  SPECS: 'SPECS',
   SIMULATED: 'SIMULATED',
   REPLAY: 'REPLAY',
 } as const;

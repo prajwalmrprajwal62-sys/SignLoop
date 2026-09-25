@@ -10,6 +10,7 @@ import tutorRoutes from './routes/tutorRoutes';
 import fixtureRoutes from './routes/fixtureRoutes';
 import privacyRoutes from './routes/privacyRoutes';
 import audioRoutes from './routes/audioRoutes';
+import bridgeRoutes from './routes/bridgeRoutes';
 import { getDb, closeDb } from './db/connection';
 
 const app = express();
@@ -109,6 +110,7 @@ app.use('/api', tutorRoutes);
 app.use('/api/fixtures', fixtureRoutes);
 app.use('/api/privacy', privacyRoutes);
 app.use('/api/audio', audioRoutes);
+app.use('/api/bridge', bridgeRoutes);
 
 // Create HTTP server
 const server = http.createServer(app);

@@ -27,7 +27,10 @@ interface ExportData {
   candidates: unknown[];
   decisions: unknown[];
   approved_outputs: unknown[];
+  tasks: unknown[];
   events_count: number;
+  exported_at: string;
+  notice: string;
 }
 
 // Gesture emoji map for visual profile display
@@ -75,11 +78,118 @@ export function ProfilePage() {
 
   const downloadExport = () => {
     if (!exportData) return;
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const d = exportData;
+    const sessions = (d.sessions ?? []) as Array<Record<string, unknown>>;
+    const candidates = (d.candidates ?? []) as Array<Record<string, unknown>>;
+    const decisions = (d.decisions ?? []) as Array<Record<string, unknown>>;
+    const outputs = (d.approved_outputs ?? []) as Array<Record<string, unknown>>;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SignLoop Data Export — ${pseudonymousCode ?? 'profile'}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #fff; color: #1a1a2e; padding: 40px; line-height: 1.6; }
+  h1 { font-size: 28px; margin-bottom: 4px; color: #0f172a; }
+  h2 { font-size: 18px; margin: 28px 0 10px; color: #334155; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; }
+  .subtitle { color: #64748b; font-size: 13px; margin-bottom: 24px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .info-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+  .info-box .label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+  .info-box .value { font-size: 16px; font-weight: 700; color: #0f172a; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+  th { background: #f1f5f9; text-align: left; padding: 8px 12px; font-weight: 600; color: #475569; border-bottom: 2px solid #cbd5e1; }
+  td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #334155; }
+  tr:hover td { background: #f8fafc; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+  .badge-pass { background: #dcfce7; color: #166534; }
+  .badge-review { background: #fef3c7; color: #92400e; }
+  .badge-fail { background: #fecaca; color: #991b1b; }
+  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+  .empty { color: #94a3b8; font-style: italic; padding: 20px; text-align: center; }
+  @media print { body { padding: 20px; } .no-print { display: none; } }
+</style>
+</head>
+<body>
+<h1>SignLoop — Data Export Report</h1>
+<p class="subtitle">Profile: <strong>${pseudonymousCode ?? 'Unknown'}</strong> · Role: <strong>${d.profile?.role ?? 'N/A'}</strong> · Exported: ${new Date().toLocaleString()}</p>
+
+<div class="info-grid">
+  <div class="info-box"><div class="label">Sessions</div><div class="value">${sessions.length}</div></div>
+  <div class="info-box"><div class="label">Candidates</div><div class="value">${candidates.length}</div></div>
+  <div class="info-box"><div class="label">Decisions</div><div class="value">${decisions.length}</div></div>
+</div>
+
+<h2>Sessions</h2>
+${sessions.length === 0 ? '<p class="empty">No sessions recorded.</p>' : `
+<table>
+<tr><th>ID</th><th>Context</th><th>Source</th><th>Provenance</th><th>Status</th><th>Started</th></tr>
+${sessions.map((s: Record<string, unknown>) => `<tr>
+  <td><code>${String(s.id ?? '').slice(0, 8)}…</code></td>
+  <td>${String(s.context ?? '').replace(/_/g, ' ')}</td>
+  <td>${s.source_modality ?? '—'}</td>
+  <td>${s.provenance ?? '—'}</td>
+  <td>${s.status ?? '—'}</td>
+  <td>${s.started_at ? new Date(String(s.started_at)).toLocaleString() : '—'}</td>
+</tr>`).join('')}
+</table>`}
+
+<h2>Gesture Candidates</h2>
+${candidates.length === 0 ? '<p class="empty">No gesture candidates.</p>' : `
+<table>
+<tr><th>Gesture</th><th>Model Score</th><th>Route</th><th>Reason</th><th>Time</th></tr>
+${candidates.map((c: Record<string, unknown>) => {
+      const score = c.score != null ? Math.round(Number(c.score) * 100) + '%' : 'unmeasured';
+      const route = String(c.policy_route ?? '');
+      const badgeClass = route === 'CANDIDATE_READY' ? 'badge-pass' : route === 'REVIEW_REQUIRED' ? 'badge-review' : 'badge-fail';
+      return `<tr>
+  <td><strong>${c.intent_label ?? '—'}</strong></td>
+  <td>${score}</td>
+  <td><span class="badge ${badgeClass}">${route.replace(/_/g, ' ')}</span></td>
+  <td>${c.why_reason_code ?? '—'}</td>
+  <td>${c.created_at ? new Date(String(c.created_at)).toLocaleString() : '—'}</td>
+</tr>`;
+    }).join('')}
+</table>`}
+
+<h2>Human Decisions</h2>
+${decisions.length === 0 ? '<p class="empty">No decisions recorded.</p>' : `
+<table>
+<tr><th>Action</th><th>Final Intent</th><th>Actor</th><th>Note</th><th>Time</th></tr>
+${decisions.map((d: Record<string, unknown>) => `<tr>
+  <td><strong>${d.action ?? '—'}</strong></td>
+  <td>${d.final_intent ?? '—'}</td>
+  <td>${d.actor_role ?? '—'}</td>
+  <td>${d.note ?? '—'}</td>
+  <td>${d.created_at ? new Date(String(d.created_at)).toLocaleString() : '—'}</td>
+</tr>`).join('')}
+</table>`}
+
+<h2>Approved Outputs</h2>
+${outputs.length === 0 ? '<p class="empty">No approved outputs.</p>' : `
+<table>
+<tr><th>Intent</th><th>Caption</th><th>Locale</th><th>Time</th></tr>
+${outputs.map((o: Record<string, unknown>) => `<tr>
+  <td><strong>${o.final_intent ?? '—'}</strong></td>
+  <td>${o.caption_text ?? '—'}</td>
+  <td>${o.locale ?? '—'}</td>
+  <td>${o.created_at ? new Date(String(o.created_at)).toLocaleString() : '—'}</td>
+</tr>`).join('')}
+</table>`}
+
+<div class="footer">
+  Exported from <strong>SignLoop</strong> · All data stored locally on this device only · ${new Date().toLocaleString()}
+</div>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `signloop-export-${pseudonymousCode ?? 'profile'}-${Date.now()}.json`;
+    a.download = `signloop-export-${pseudonymousCode ?? 'profile'}-${Date.now()}.html`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -344,7 +454,7 @@ export function ProfilePage() {
                   onClick={downloadExport}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition-all"
                 >
-                  <Download size={12} /> Download .json
+                  <Download size={12} /> Download .html
                 </button>
                 <button onClick={() => setShowExport(false)} className="text-slate-400 hover:text-white text-sm px-2">✕</button>
               </div>

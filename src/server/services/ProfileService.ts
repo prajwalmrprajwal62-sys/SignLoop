@@ -2,6 +2,9 @@
 import { getDb } from '../db/connection';
 import type { Profile, ProfileContext } from '../../shared/types/profiles';
 
+// Local-only PIN storage (in-memory) — acceptable for a local-first tool with no network access
+const pinStore = new Map<string, string>();
+
 export class ProfileService {
   static getAll(): Profile[] {
     return getDb().prepare("SELECT * FROM profiles WHERE visibility_status = 'ACTIVE'").all() as Profile[];
@@ -9,6 +12,12 @@ export class ProfileService {
 
   static getById(id: string): Profile | undefined {
     return getDb().prepare('SELECT * FROM profiles WHERE id = ?').get(id) as Profile | undefined;
+  }
+
+  static getByCode(pseudonymous_code: string): Profile | undefined {
+    return getDb().prepare(
+      "SELECT * FROM profiles WHERE pseudonymous_code = ? AND visibility_status = 'ACTIVE'"
+    ).get(pseudonymous_code) as Profile | undefined;
   }
 
   static create(data: Omit<Profile, 'id' | 'created_at' | 'updated_at'>): Profile {
@@ -20,6 +29,14 @@ export class ProfileService {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(id, data.pseudonymous_code, data.role, data.preferred_locale, data.visibility_status, now, now);
     return this.getById(id)!;
+  }
+
+  static setPin(profileId: string, pin: string): void {
+    pinStore.set(profileId, pin);
+  }
+
+  static getPin(profileId: string): string | undefined {
+    return pinStore.get(profileId);
   }
 
   static getContextsForProfile(profileId: string): ProfileContext[] {

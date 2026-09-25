@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useProfileStore } from '../../stores/profileStore';
 import { useLiveStore } from '../../stores/liveStore';
@@ -7,8 +7,8 @@ import { MonoLabel } from '../../components/common/MonoLabel';
 import { ProvenanceChip } from '../../components/common/ProvenanceChip';
 import { GlassCard } from '../../components/common/GlassCard';
 import { SectionHeader } from '../../components/common/SectionHeader';
-import { apiPost } from '../../api/client';
-import { CheckCircle, XCircle, Clock, Lock, Unlock, Play, Zap, RotateCcw } from 'lucide-react';
+import { apiGet, apiPost } from '../../api/client';
+import { CheckCircle, XCircle, Clock, Lock, Unlock, Play, Zap, RotateCcw, Wifi, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type SourceType = 'GLOVE' | 'CAMERA' | 'SIMULATED' | 'REPLAY';
@@ -97,6 +97,46 @@ export function LivePage() {
   const [events, setEvents] = useState<Array<{ type: string; label: string; at: string }>>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Hardware connection status
+  const [gloveConnected, setGloveConnected] = useState(false);
+  const [specsConnected, setSpecsConnected] = useState(false);
+  const [hwPolling, setHwPolling] = useState(false);
+
+  const pollHardwareStatus = useCallback(async () => {
+    try {
+      const [gloveRes, specsRes] = await Promise.all([
+        apiGet<{ ok: boolean; connected?: boolean; status?: string }>('/api/bridge/glove/status'),
+        apiGet<{ ok: boolean; connected?: boolean; status?: string }>('/api/bridge/specs/status'),
+      ]);
+      setGloveConnected(gloveRes.connected === true || gloveRes.status === 'connected');
+      setSpecsConnected(specsRes.connected === true || specsRes.status === 'connected');
+    } catch {
+      // Silently handle — hardware might not be available
+    }
+  }, []);
+
+  useEffect(() => {
+    void pollHardwareStatus();
+    const interval = setInterval(() => void pollHardwareStatus(), 5000);
+    return () => clearInterval(interval);
+  }, [pollHardwareStatus]);
+
+  const connectGlove = async () => {
+    if (!session || !activeProfileId) return;
+    setHwPolling(true);
+    try {
+      await apiPost('/api/bridge/glove/start', {
+        session_id: session.id,
+        profile_id: activeProfileId,
+      });
+      await pollHardwareStatus();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setHwPolling(false);
+    }
+  };
 
   useEffect(() => {
     resetLive();
@@ -245,6 +285,43 @@ export function LivePage() {
         )}
         {sourceType === 'SIMULATED' && <ProvenanceChip label="SIMULATED" />}
       </div>
+
+      {/* Hardware Status */}
+      <GlassCard className="p-4">
+        <SectionHeader className="mb-3">Hardware Status</SectionHeader>
+        <div className="flex items-center gap-6 flex-wrap">
+          {/* Glove status */}
+          <div className="flex items-center gap-2">
+            {gloveConnected
+              ? <Wifi size={14} className="text-emerald-400" />
+              : <WifiOff size={14} className="text-red-400" />}
+            <span className={`w-2.5 h-2.5 rounded-full ${gloveConnected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)]' : 'bg-red-500'}`} />
+            <span className="text-xs font-mono text-slate-300">
+              Glove: <span className={gloveConnected ? 'text-emerald-400' : 'text-red-400'}>{gloveConnected ? 'Connected' : 'Disconnected'}</span>
+            </span>
+          </div>
+
+          {/* Specs status */}
+          <div className="flex items-center gap-2">
+            {specsConnected
+              ? <Wifi size={14} className="text-emerald-400" />
+              : <WifiOff size={14} className="text-red-400" />}
+            <span className={`w-2.5 h-2.5 rounded-full ${specsConnected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)]' : 'bg-red-500'}`} />
+            <span className="text-xs font-mono text-slate-300">
+              Specs: <span className={specsConnected ? 'text-emerald-400' : 'text-red-400'}>{specsConnected ? 'Connected' : 'Disconnected'}</span>
+            </span>
+          </div>
+
+          {/* Connect Glove button */}
+          <button
+            onClick={() => void connectGlove()}
+            disabled={!session || sourceType === 'SIMULATED' || sourceType === 'REPLAY' || hwPolling}
+            className="ml-auto flex items-center gap-2 h-8 px-4 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-mono font-semibold text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            {hwPolling ? 'Connecting…' : 'Connect Glove'}
+          </button>
+        </div>
+      </GlassCard>
 
       {error && (
         <div className="rounded-lg border border-red-600/30 p-3 text-red-400 text-sm font-mono" style={{ background: 'rgba(220,38,38,0.1)' }}>

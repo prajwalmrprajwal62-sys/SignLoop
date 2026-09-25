@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useProfileStore } from '../../stores/profileStore';
 import { GradientText } from '../../components/common/GradientText';
-import { apiGet, apiPost } from '../../api/client';
+import { apiPost } from '../../api/client';
 
 interface Profile {
   id: string;
@@ -12,6 +12,8 @@ interface Profile {
   preferred_locale: string;
   visibility_status: string;
 }
+
+type AuthMode = 'LOGIN' | 'REGISTER';
 
 const ROLES = [
   {
@@ -40,43 +42,83 @@ const ROLES = [
   },
 ];
 
+const ROLE_HOME: Record<string, string> = {
+  STUDENT: '/live',
+  TEACHER: '/trainer',
+  STAFF: '/communication',
+};
+
 export function RoleSelectPage() {
   const navigate = useNavigate();
   const { setProfile } = useProfileStore();
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [authMode, setAuthMode] = useState<AuthMode>('LOGIN');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
-  const [selectedProfileId, setSelectedProfileId] = useState<string>('');
+  const [pseudonymousCode, setPseudonymousCode] = useState('');
+  const [pin, setPin] = useState('');
   const [contextType, setContextType] = useState<'LEARNING_PRACTICE' | 'REAL_WORLD_INTERACTION'>('LEARNING_PRACTICE');
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiGet<{ ok: boolean; profiles: Profile[] }>('/api/profiles')
-      .then(res => setProfiles(res.profiles ?? []))
-      .catch(console.error);
-  }, []);
+  const canLogin = pseudonymousCode.trim() !== '' && consent;
+  const canRegister = pseudonymousCode.trim() !== '' && selectedRole !== null && consent;
 
-  const filteredProfiles = selectedRole
-    ? profiles.filter(p => p.role === selectedRole)
-    : profiles;
-
-  const canContinue = selectedRole !== null && selectedProfileId !== '' && consent;
-
-  const handleSubmit = async () => {
-    if (!canContinue) return;
+  const handleLogin = async () => {
+    if (!canLogin) return;
     setLoading(true);
+    setError(null);
     try {
-      const res = await apiPost<{ ok: boolean; profile: Profile; contexts: unknown[] }>(
-        `/api/profiles/${selectedProfileId}/select`,
-        {}
-      );
+      const res = await apiPost<{ ok: boolean; profile: Profile }>('/api/profiles/login', {
+        pseudonymous_code: pseudonymousCode.trim(),
+        pin: pin || undefined,
+      });
       const profile = res.profile;
-      setProfile(profile.id, profile.pseudonymous_code, selectedRole!, contextType, true);
-      navigate('/live');
+      setProfile(profile.id, profile.pseudonymous_code, profile.role, contextType, true);
+      navigate(ROLE_HOME[profile.role] ?? '/live');
     } catch (err) {
-      console.error(err);
+      const msg = String(err);
+      if (msg.includes('404')) {
+        setError('Profile not found. Check your code or register a new account.');
+      } else if (msg.includes('401')) {
+        setError('Incorrect PIN. Please try again.');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    if (!canRegister) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiPost<{ ok: boolean; profile: Profile }>('/api/profiles/register', {
+        pseudonymous_code: pseudonymousCode.trim(),
+        role: selectedRole,
+        pin: pin || undefined,
+      });
+      const profile = res.profile;
+      setProfile(profile.id, profile.pseudonymous_code, profile.role, contextType, true);
+      navigate(ROLE_HOME[profile.role] ?? '/live');
+    } catch (err) {
+      const msg = String(err);
+      if (msg.includes('409')) {
+        setError('A profile with that code already exists. Try logging in instead.');
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (authMode === 'LOGIN') {
+      void handleLogin();
+    } else {
+      void handleRegister();
     }
   };
 
@@ -121,11 +163,8 @@ export function RoleSelectPage() {
             <motion.div
               key={role.id}
               whileHover={{ rotateX: 4, rotateY: -4, scale: 1.03, y: -4 }}
-              onClick={() => {
-                setSelectedRole(role.id);
-                setSelectedProfileId('');
-              }}
-              className="w-60 h-76 rounded-2xl cursor-pointer flex flex-col items-center justify-center gap-3 border-2 transition-all duration-300 p-6 select-none"
+              onClick={() => setSelectedRole(role.id)}
+              className="w-60 h-76 rounded-2xl cursor-pointer flex flex-col items-center justify-center gap-3 border-2 transition-all duration-300 p-6 select-none relative"
               style={{
                 background: role.bg,
                 borderColor: isSelected ? role.accent : 'rgba(255,255,255,0.1)',
@@ -165,24 +204,58 @@ export function RoleSelectPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.4 }}
       >
-        {/* Profile picker */}
+        {/* Auth mode toggle */}
+        <div className="flex rounded-lg overflow-hidden border border-white/10">
+          {(['LOGIN', 'REGISTER'] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => { setAuthMode(mode); setError(null); }}
+              className={`flex-1 py-2.5 text-xs font-mono font-bold uppercase tracking-widest transition-all ${
+                authMode === mode
+                  ? 'bg-white/15 text-white'
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+              }`}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+
+        {/* Pseudonymous code input */}
         <div>
           <label className="block text-xs font-mono text-zinc-400 mb-2 uppercase tracking-wider">
-            Select Profile
+            Pseudonymous Code
           </label>
-          <select
-            className="w-full bg-zinc-900 border border-white/15 rounded-lg p-2.5 text-white font-mono text-sm focus:outline-none focus:border-cyan-500/50"
-            value={selectedProfileId}
-            onChange={e => setSelectedProfileId(e.target.value)}
-          >
-            <option value="">-- Choose profile --</option>
-            {filteredProfiles.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.pseudonymous_code} · {p.role}
-              </option>
-            ))}
-          </select>
+          <input
+            type="text"
+            placeholder="Enter your code / username"
+            className="w-full bg-zinc-900 border border-white/15 rounded-lg p-2.5 text-white font-mono text-sm focus:outline-none focus:border-cyan-500/50 placeholder:text-zinc-600"
+            value={pseudonymousCode}
+            onChange={e => setPseudonymousCode(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
+          />
         </div>
+
+        {/* Optional PIN */}
+        <div>
+          <label className="block text-xs font-mono text-zinc-400 mb-2 uppercase tracking-wider">
+            PIN <span className="text-zinc-600">(optional)</span>
+          </label>
+          <input
+            type="password"
+            placeholder="••••"
+            maxLength={8}
+            className="w-full bg-zinc-900 border border-white/15 rounded-lg p-2.5 text-white font-mono text-sm focus:outline-none focus:border-cyan-500/50 placeholder:text-zinc-600"
+            value={pin}
+            onChange={e => setPin(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
+          />
+        </div>
+
+        {/* Role hint for register mode */}
+        {authMode === 'REGISTER' && !selectedRole && (
+          <p className="text-amber-400 text-xs font-mono">↑ Select a role above to register</p>
+        )}
 
         {/* Context toggle */}
         <div>
@@ -217,13 +290,27 @@ export function RoleSelectPage() {
           <span>I understand this is a local-only training tool. No data leaves this device.</span>
         </label>
 
-        {/* Continue */}
+        {/* Error message */}
+        {error && (
+          <div
+            className="rounded-lg border border-red-600/30 p-3 text-red-400 text-sm font-mono"
+            style={{ background: 'rgba(220,38,38,0.1)' }}
+          >
+            {error}
+          </div>
+        )}
+
+        {/* Submit button */}
         <button
-          onClick={() => void handleSubmit()}
-          disabled={!canContinue || loading}
+          onClick={handleSubmit}
+          disabled={(authMode === 'LOGIN' ? !canLogin : !canRegister) || loading}
           className="w-full h-12 bg-gradient-to-r from-cyan-500 to-teal-500 text-zinc-950 font-extrabold uppercase tracking-wider rounded-xl disabled:opacity-40 disabled:cursor-not-allowed hover:from-cyan-400 hover:to-teal-400 transition-all"
         >
-          {loading ? 'Starting…' : 'Continue →'}
+          {loading
+            ? 'Working…'
+            : authMode === 'LOGIN'
+              ? 'Login →'
+              : 'Register →'}
         </button>
       </motion.div>
     </div>
