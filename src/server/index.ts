@@ -35,6 +35,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// Root route — shows backend is live (not a 404)
+app.get('/', (_req: Request, res: Response) => {
+  res.json({
+    service: 'SignLoop API',
+    status: 'running',
+    version: '1.0.0',
+    docs: '/api/health',
+    note: 'This is the SignLoop backend API. The frontend is at the Static Site URL.',
+  });
+});
+
 /**
  * GET /api/health
  * Returns server and database health verification status for Milestone M1
