@@ -49,8 +49,8 @@ const GESTURE_RULES: GestureRule[] = [
   {
     label: 'WATER',
     match: (f) => (f[0]! + f[1]!) > 1200 && f[2]! < 400,
-    conditionCount: 3,
-    matchedCount: (f) => [(f[0]! + f[1]!) > 1200, f[2]! < 400].filter(Boolean).length + (f[0]! > 0 ? 1 : 0),
+    conditionCount: 2,
+    matchedCount: (f) => [(f[0]! + f[1]!) > 1200, f[2]! < 400].filter(Boolean).length,
   },
   {
     label: 'FOOD',
@@ -129,6 +129,9 @@ let bridgeStatus: BridgeStatus = 'NOT_CONNECTED';
 let activeSessionId: string | null = null;
 let activeProfileId: string | null = null;
 let incomingBuffer = '';
+let lastPostedLabel: string | null = null;
+let lastPostedAt: number = 0;
+const DEBOUNCE_MS = 1500; // same label within 1.5s → skip duplicate
 
 // ---------------------------------------------------------------------------
 // Sensor packet parser
@@ -248,6 +251,12 @@ function handleData(data: Buffer): void {
 
     const gesture = classifyGesture(packet.flex);
     if (gesture && activeSessionId && activeProfileId) {
+      const now = Date.now();
+      if (gesture.label === lastPostedLabel && (now - lastPostedAt) < DEBOUNCE_MS) {
+        continue; // debounce — same gesture still being held
+      }
+      lastPostedLabel = gesture.label;
+      lastPostedAt = now;
       postCandidate(activeSessionId, activeProfileId, gesture.label, gesture.modelScore);
     }
   }
@@ -307,6 +316,8 @@ export function stopGloveBridge(): void {
   activeProfileId = null;
   bridgeStatus = 'NOT_CONNECTED';
   incomingBuffer = '';
+  lastPostedLabel = null;
+  lastPostedAt = 0;
   console.log('[GloveBridge] Stopped');
 }
 

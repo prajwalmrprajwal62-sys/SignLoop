@@ -3,6 +3,7 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { GlassCard } from '../../components/common/GlassCard';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { useProfileStore } from '../../stores/profileStore';
+import { apiPost } from '../../api/client';
 import { Volume2, RotateCcw, CheckCircle, X, BookOpen, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -58,7 +59,7 @@ function speakPhrase(text: string) {
 }
 
 export function CommunicationPage() {
-  const { role } = useProfileStore();
+  const { role, activeProfileId: profileId } = useProfileStore();
   const isStaff = role === 'STAFF';
 
   const [mode, setMode] = useState<'COMMUNICATE' | 'TEACH'>('COMMUNICATE');
@@ -82,6 +83,16 @@ export function CommunicationPage() {
     speakPhrase(currentIntent.caption);
     setTimeout(() => setSpeaking(false), 2000);
 
+    // Persist this output to the audit trail (fire-and-forget — no UI impact)
+    if (profileId) {
+      void apiPost('/api/comm/event', {
+        profile_id: profileId,
+        intent_id: currentIntent.id,
+        caption_text: currentIntent.caption,
+        action: 'CONFIRMED',
+      }).catch(() => { /* non-critical */ });
+    }
+
     setRecent(prev => [{
       id: crypto.randomUUID(),
       intent: currentIntent.id,
@@ -90,13 +101,24 @@ export function CommunicationPage() {
       at: new Date().toLocaleTimeString(),
       status: 'CONFIRMED' as const,
     }, ...prev].slice(0, 8));
-  }, [currentIntent]);
+  }, [currentIntent, profileId]);
 
   const handleRepeat = useCallback(() => {
     if (!currentIntent) return;
     setDecision('NEEDS_REPEAT');
     // Speak again on repeat
     speakPhrase(currentIntent.caption);
+
+    // Persist repeat event to audit trail
+    if (profileId) {
+      void apiPost('/api/comm/event', {
+        profile_id: profileId,
+        intent_id: currentIntent.id,
+        caption_text: currentIntent.caption,
+        action: 'REPEATED',
+      }).catch(() => { /* non-critical */ });
+    }
+
     setRecent(prev => [{
       id: crypto.randomUUID(),
       intent: currentIntent.id,
@@ -105,7 +127,7 @@ export function CommunicationPage() {
       at: new Date().toLocaleTimeString(),
       status: 'REPEATED' as const,
     }, ...prev].slice(0, 8));
-  }, [currentIntent]);
+  }, [currentIntent, profileId]);
 
   const handleCancel = useCallback(() => {
     window.speechSynthesis?.cancel();

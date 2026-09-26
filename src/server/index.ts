@@ -13,6 +13,7 @@ import privacyRoutes from './routes/privacyRoutes';
 import audioRoutes from './routes/audioRoutes';
 import bridgeRoutes from './routes/bridgeRoutes';
 import questionRoutes from './routes/questionRoutes';
+import { commRouter } from './routes/commRoutes';
 import { getDb, closeDb } from './db/connection';
 
 const app = express();
@@ -114,6 +115,7 @@ app.use('/api/privacy', privacyRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/bridge', bridgeRoutes);
 app.use('/api/questions', questionRoutes);
+app.use('/api/comm', commRouter);
 
 // Create HTTP server
 const server = http.createServer(app);
