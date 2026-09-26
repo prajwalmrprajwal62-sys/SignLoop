@@ -19,8 +19,7 @@ services:
   - type: web
     name: signloop-frontend
     runtime: static
-    # No region — static sites use Render's global CDN automatically
-    plan: free
+    # No region or plan needed — static sites on Render are always free (global CDN)
     buildCommand: npm install && npm run build:frontend
     staticPublishPath: ./dist
     headers:
