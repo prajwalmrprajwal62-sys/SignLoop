@@ -16,9 +16,10 @@ services:
         sync: false        # you will set this in Render dashboard
 
   # ─── Frontend (Static Site) ──────────────────────────────────────────────────
-  - type: static
+  - type: web
     name: signloop-frontend
-    # Static sites don't support region — Render auto-places them on a global CDN
+    runtime: static
+    # No region — static sites use Render's global CDN automatically
     plan: free
     buildCommand: npm install && npm run build:frontend
     staticPublishPath: ./dist
@@ -29,4 +30,4 @@ services:
     routes:
       - type: rewrite
         source: /*
-        destination: /index.html   # SPA fallback — all routes go to React router
+        destination: /index.html
