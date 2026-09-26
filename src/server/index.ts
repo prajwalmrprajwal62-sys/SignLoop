@@ -15,6 +15,7 @@ import bridgeRoutes from './routes/bridgeRoutes';
 import questionRoutes from './routes/questionRoutes';
 import { commRouter } from './routes/commRoutes';
 import { getDb, closeDb } from './db/connection';
+import { runMigrations } from './db/migrate';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -133,6 +134,16 @@ const server = http.createServer(app);
 
 // Start server if executed directly
 if (process.env.NODE_ENV !== 'test') {
+  // Auto-run migrations on every startup — idempotent, skips already-applied ones.
+  // Critical for Render/production: fresh SQLite DB starts with 0 tables.
+  try {
+    const results = runMigrations({ silent: false });
+    const applied = results.filter(r => r.applied).length;
+    console.log(`[SignLoop Server] Migrations: ${applied} applied, ${results.length} total`);
+  } catch (err) {
+    console.error('[SignLoop Server] Migration failed — starting anyway:', err);
+  }
+
   server.listen(PORT, () => {
     console.log(`[SignLoop Server] Listening on http://localhost:${PORT}`);
     console.log(`[SignLoop Server] Health endpoint: http://localhost:${PORT}/api/health`);
