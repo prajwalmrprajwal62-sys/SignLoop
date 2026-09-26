@@ -1,0 +1,33 @@
+services:
+  # ─── Backend API (Web Service) ───────────────────────────────────────────────
+  - type: web
+    name: signloop-backend
+    runtime: node
+    region: singapore      # closest to India
+    plan: free
+    buildCommand: npm install
+    startCommand: npx tsx src/server/index.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: GEMINI_API_KEY
+        sync: false        # you will set this in Render dashboard
+
+  # ─── Frontend (Static Site) ──────────────────────────────────────────────────
+  - type: web
+    name: signloop-frontend
+    runtime: static
+    region: singapore
+    plan: free
+    buildCommand: npm install && npm run build:frontend
+    staticPublishPath: ./dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html   # SPA fallback — all routes go to React router
