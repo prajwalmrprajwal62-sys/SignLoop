@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { HelpCircle, Eye, ChevronRight, BookOpen, Loader2, Send, Sparkles } from 'lucide-react';
 import { apiPost } from '../../api/client';
 import { TutorResponseView } from './TutorResponse';
@@ -47,7 +47,8 @@ export function TutorPanel({ profileId, contextType, role, consentGranted, inten
 
   // Auto-run SHOW_REFERENCE on mount to show gesture info immediately
   useEffect(() => {
-    void handleQuery('SHOW_REFERENCE', 'How to sign this gesture');
+    // Pass intent as query text so FTS finds the right seed knowledge
+    void handleQuery('SHOW_REFERENCE', 'Show gesture', intentId ?? 'sign language technique ISL');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -114,7 +115,7 @@ export function TutorPanel({ profileId, contextType, role, consentGranted, inten
       <div className="flex items-center gap-2 px-4 py-3 border-b border-violet-500/15" style={{ background: 'rgba(139,92,246,0.08)' }}>
         <BookOpen size={13} className="text-violet-400" />
         <span className="text-violet-300 text-xs font-semibold uppercase tracking-wider">AI Sign Tutor</span>
-        <span className="ml-auto text-[10px] font-mono text-slate-600">RAG � grounded</span>
+        <span className="ml-auto text-[10px] font-mono text-slate-600">RAG � grounded</span>
       </div>
 
       {/* Quick-action buttons */}
@@ -189,7 +190,7 @@ export function TutorPanel({ profileId, contextType, role, consentGranted, inten
           </button>
         </div>
         <p className="text-[10px] text-slate-700 font-mono mt-1.5 text-center">
-          Answers from sign language knowledge base · personalized to your practice
+          Answers grounded in teacher knowledge · personalized to your practice
         </p>
       </div>
     </div>
