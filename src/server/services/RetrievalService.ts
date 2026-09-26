@@ -38,7 +38,21 @@ export class RetrievalService {
     }
 
     const allowedClasses = ALLOWED_SOURCE_CLASSES;
-    const ftsQuery = params.queryText.trim().replace(/[^a-zA-Z0-9 ]/g, ' ').trim();
+    // FTS5 by default ANDs all tokens — "sign language technique ISL" requires ALL 4 words in one doc.
+    // Switch to OR matching so any relevant seed is found even with partial overlap.
+    const rawTokens = params.queryText.trim()
+      .replace(/[^a-zA-Z0-9 ]/g, ' ')
+      .split(/\s+/)
+      .filter(t => t.length > 2); // drop stop-word-length tokens (the, is, a...)
+
+    // Always add the intentId as a search token — ensures gesture-specific seeds are found
+    if (params.intentId) {
+      rawTokens.push(params.intentId);
+    }
+
+    const uniqueTokens = [...new Set(rawTokens)];
+    // FTS5 OR syntax: join with " OR " so ANY token match returns a result
+    const ftsQuery = uniqueTokens.length > 0 ? uniqueTokens.join(' OR ') : '';
 
     const results: RetrievalResult[] = [];
     const candidateSourceIds: string[] = [];

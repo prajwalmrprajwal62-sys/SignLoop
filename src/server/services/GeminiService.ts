@@ -42,23 +42,13 @@ export class GeminiService {
   }
 
   static async synthesize(params: GeminiSynthesisParams): Promise<GeminiSynthesisResult> {
-    // FIX P0.2: Gemini is a rewriting layer over retrieved evidence, NOT an evidence source.
-    // If no local sources were retrieved, skip Gemini entirely — return FALLBACK immediately.
-    // This prevents GENERAL_KNOWLEDGE answers from being mislabelled as GROUNDED.
-    if (!params.hasGrounding) {
-      return {
-        answer_text: GeminiService.buildTemplateFallback(params),
-        used_gemini: false,
-        grounding_level: 'FALLBACK',
-      };
-    }
-
     const client = getClient();
     if (!client) {
+      // No API key — use template. If we have sources, template is GROUNDED. Otherwise GENERAL_KNOWLEDGE.
       return {
         answer_text: GeminiService.buildTemplateFallback(params),
         used_gemini: false,
-        grounding_level: 'GROUNDED', // Has local sources — template answer is grounded
+        grounding_level: params.hasGrounding ? 'GROUNDED' : 'GENERAL_KNOWLEDGE',
       };
     }
 
@@ -72,14 +62,14 @@ export class GeminiService {
       return {
         answer_text: text || GeminiService.buildTemplateFallback(params),
         used_gemini: true,
-        grounding_level: 'GROUNDED', // We only reach here when local sources exist
+        grounding_level: params.hasGrounding ? 'GROUNDED' : 'GENERAL_KNOWLEDGE',
       };
     } catch (err) {
       console.error('[GeminiService] synthesis failed:', err);
       return {
         answer_text: GeminiService.buildTemplateFallback(params),
         used_gemini: false,
-        grounding_level: 'GROUNDED', // Local sources exist — template answer is grounded
+        grounding_level: params.hasGrounding ? 'GROUNDED' : 'GENERAL_KNOWLEDGE',
       };
     }
   }
@@ -112,6 +102,11 @@ export class GeminiService {
       params.retrievedSources.forEach((s, i) => {
         lines.push(`[Source ${i + 1}]: ${s.content}`);
       });
+    } else {
+      lines.push('');
+      lines.push('No specific teacher notes found for this query. Answer from your general Indian Sign Language (ISL) knowledge.');
+      lines.push('You are knowledgeable about ISL gestures, technique, and common mistakes. Give a helpful, accurate answer.');
+      lines.push('If the question is very specific to a student\'s personal situation, suggest they ask their teacher too.');
     }
 
     if (params.strugglingGestures?.length) {

@@ -107,17 +107,18 @@ router.post('/tutor/respond', async (req: Request, res: Response) => {
       intentId: intent_id,
     });
 
-    // Use Gemini answer if available — but ONLY mark GROUNDED when local sources were retrieved.
-    // FIX P0.2: GENERAL_KNOWLEDGE (Gemini answered from general knowledge, no local sources)
-    // must NOT be stored as GROUNDED — that violates the RAG contract.
-    // Gemini is a rewriting layer over retrieved evidence, not an evidence source.
+    // Determine final answer and status:
+    // - Local sources found → use Gemini answer (grounded in retrieved content) → GROUNDED
+    // - No local sources → use Gemini general ISL answer → GENERAL_KNOWLEDGE
+    // - Gemini unavailable → use template fallback
+    // INSUFFICIENT_EVIDENCE only fires when Gemini itself couldn't produce an answer
     const hasLocalSources = results.length > 0;
-    const finalAnswerText = hasLocalSources
-      ? (synthesis.answer_text || validation.answer_text)
-      : validation.answer_text; // No local sources → use template abstention, not Gemini general answer
+    const finalAnswerText = synthesis.answer_text || validation.answer_text;
     const finalStatus = hasLocalSources
-      ? validation.status  // GROUNDED only when local FTS5 sources found
-      : 'INSUFFICIENT_EVIDENCE'; // No local sources → always abstain, never GROUNDED
+      ? validation.status            // GROUNDED when FTS5 sources found
+      : (synthesis.answer_text
+          ? synthesis.grounding_level ?? 'GENERAL_KNOWLEDGE'  // Gemini answered from general ISL
+          : 'INSUFFICIENT_EVIDENCE');  // Gemini also failed → nothing to show
 
     // Step 5: Persist tutor response
     const now = new Date().toISOString();
