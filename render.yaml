@@ -16,10 +16,9 @@ services:
         sync: false        # you will set this in Render dashboard
 
   # ─── Frontend (Static Site) ──────────────────────────────────────────────────
-  - type: web
+  - type: static
     name: signloop-frontend
-    runtime: static
-    region: singapore
+    # Static sites don't support region — Render auto-places them on a global CDN
     plan: free
     buildCommand: npm install && npm run build:frontend
     staticPublishPath: ./dist
