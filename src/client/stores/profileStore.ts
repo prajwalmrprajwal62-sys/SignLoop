@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface ProfileStore {
   activeProfileId: string | null;
@@ -10,14 +11,29 @@ interface ProfileStore {
   clearProfile: () => void;
 }
 
-export const useProfileStore = create<ProfileStore>((set) => ({
-  activeProfileId: null,
-  pseudonymousCode: null,
-  role: null,
-  contextType: null,
-  consentGranted: false,
-  setProfile: (profileId, code, role, contextType, consent) =>
-    set({ activeProfileId: profileId, pseudonymousCode: code, role, contextType, consentGranted: consent }),
-  clearProfile: () =>
-    set({ activeProfileId: null, pseudonymousCode: null, role: null, contextType: null, consentGranted: false }),
-}));
+export const useProfileStore = create<ProfileStore>()(
+  persist(
+    (set) => ({
+      activeProfileId: null,
+      pseudonymousCode: null,
+      role: null,
+      contextType: null,
+      consentGranted: false,
+      setProfile: (profileId, code, role, contextType, consent) =>
+        set({ activeProfileId: profileId, pseudonymousCode: code, role, contextType, consentGranted: consent }),
+      clearProfile: () =>
+        set({ activeProfileId: null, pseudonymousCode: null, role: null, contextType: null, consentGranted: false }),
+    }),
+    {
+      name: 'signloop-profile', // localStorage key
+      // Only persist the identity fields — not the action functions
+      partialize: (state) => ({
+        activeProfileId: state.activeProfileId,
+        pseudonymousCode: state.pseudonymousCode,
+        role: state.role,
+        contextType: state.contextType,
+        consentGranted: state.consentGranted,
+      }),
+    }
+  )
+);
