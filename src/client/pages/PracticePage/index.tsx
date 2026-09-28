@@ -230,20 +230,22 @@ export function PracticePage() {
             </motion.div>
           ) : (
             <>
-              {/* Gesture visual — shown above the empty state when a card is clicked */}
+              {/* Gesture visual — full image, no crop */}
               <GestureVisual
                 gestureKey={selectedGesture}
                 onClose={() => setSelectedGesture(null)}
                 emoji={selectedGesture ? (GESTURE_META[selectedGesture]?.emoji ?? '🤚') : ''}
               />
 
-              <GlassCard className="p-10 flex flex-col items-center text-center gap-4">
-                <Target size={44} className="text-slate-600" />
+              {/* Compact empty state — shown below the gesture image */}
+              <div className="flex items-center gap-3 rounded-xl border border-white/8 px-4 py-3"
+                style={{ background: 'rgba(255,255,255,0.03)' }}>
+                <Target size={20} className="text-slate-600 shrink-0" />
                 <div>
-                  <p className="text-slate-300 font-semibold text-lg">No active practice tasks</p>
-                  <p className="text-slate-500 text-sm mt-1">Your teacher will assign tasks to your profile. Use the tutor above to explore or ask questions.</p>
+                  <p className="text-slate-400 font-medium text-sm">No active practice tasks</p>
+                  <p className="text-slate-600 text-xs mt-0.5">Your teacher will assign tasks to your profile.</p>
                 </div>
-              </GlassCard>
+              </div>
             </>
           )}
 

@@ -142,14 +142,13 @@ export function GestureVisual({ gestureKey, onClose, emoji }: GestureVisualProps
             </span>
           </div>
 
-          {/* Image or SVG */}
+          {/* Image — full square, no crop */}
           {hasPhoto ? (
             <div className="px-3 pb-1">
               <img
                 src={`/gestures/${gestureKey.toLowerCase()}.jpg`}
                 alt={`${gestureKey} hand sign`}
-                className="w-full rounded-xl object-cover"
-                style={{ maxHeight: '220px', objectPosition: 'center top' }}
+                className="w-full rounded-xl object-contain"
               />
             </div>
           ) : (
