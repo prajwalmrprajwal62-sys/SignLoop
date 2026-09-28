@@ -25,6 +25,8 @@ export function seedDatabase(options: { silent?: boolean } = {}): void {
     insertProfile.run('prof-stu-02', 'STU-02', 'STUDENT', 'en-IN', 'ACTIVE', now, now);
     insertProfile.run('prof-trn-01', 'TRN-01', 'TEACHER', 'en-IN', 'ACTIVE', now, now);
     insertProfile.run('prof-staff-01', 'STAFF-01', 'STAFF', 'en-IN', 'ACTIVE', now, now);
+    // Praju — primary demo student account
+    insertProfile.run('edbdb97b-6d68-4e4c-a128-8fd16ddd5678', 'Praju', 'STUDENT', 'en-IN', 'ACTIVE', now, now);
 
     // ------------------------------------------------------------------------
     // 2. Profile Contexts
@@ -40,6 +42,9 @@ export function seedDatabase(options: { silent?: boolean } = {}): void {
     insertContext.run('ctx-stu-02-learn', 'prof-stu-02', 'LEARNING_PRACTICE', 'GRANTED', 'TEXT_AND_AUDIO', 1, now, now);
     insertContext.run('ctx-trn-01-learn', 'prof-trn-01', 'LEARNING_PRACTICE', 'GRANTED', 'TEXT_AND_AUDIO', 1, now, now);
     insertContext.run('ctx-staff-01-comm', 'prof-staff-01', 'REAL_WORLD_INTERACTION', 'GRANTED', 'TEXT_AND_AUDIO', 1, now, now);
+    // Praju contexts
+    insertContext.run('ctx-praju-learn', 'edbdb97b-6d68-4e4c-a128-8fd16ddd5678', 'LEARNING_PRACTICE', 'GRANTED', 'TEXT_AND_AUDIO', 1, now, now);
+    insertContext.run('ctx-praju-comm', 'edbdb97b-6d68-4e4c-a128-8fd16ddd5678', 'REAL_WORLD_INTERACTION', 'GRANTED', 'TEXT_AND_AUDIO', 1, now, now);
 
     // ------------------------------------------------------------------------
     // 3. Consent and Retention Records
@@ -55,6 +60,9 @@ export function seedDatabase(options: { silent?: boolean } = {}): void {
     insertConsent.run('cons-stu-02-train', 'prof-stu-02', 'TRAINING_GROUNDING', 'ACTIVE', 'NOT_STORED', 'STORED_UNTIL_REVOKED', null, null, now);
     insertConsent.run('cons-trn-01-train', 'prof-trn-01', 'TRAINING_GROUNDING', 'ACTIVE', 'NOT_STORED', 'STORED_UNTIL_REVOKED', null, null, now);
     insertConsent.run('cons-staff-01-sess', 'prof-staff-01', 'SESSION_ONLY', 'ACTIVE', 'NOT_STORED', 'STORED_UNTIL_REVOKED', null, null, now);
+    // Praju consent
+    insertConsent.run('cons-praju-train', 'edbdb97b-6d68-4e4c-a128-8fd16ddd5678', 'TRAINING_GROUNDING', 'ACTIVE', 'NOT_STORED', 'STORED_UNTIL_REVOKED', null, null, now);
+    insertConsent.run('cons-praju-sess', 'edbdb97b-6d68-4e4c-a128-8fd16ddd5678', 'SESSION_ONLY', 'ACTIVE', 'NOT_STORED', 'STORED_UNTIL_REVOKED', null, null, now);
 
     // ------------------------------------------------------------------------
     // 4. Practice Tasks

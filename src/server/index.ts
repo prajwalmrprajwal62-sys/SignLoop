@@ -16,6 +16,7 @@ import questionRoutes from './routes/questionRoutes';
 import { commRouter } from './routes/commRoutes';
 import { getDb, closeDb } from './db/connection';
 import { runMigrations } from './db/migrate';
+import { seedDatabase } from './db/seed';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -142,6 +143,22 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`[SignLoop Server] Migrations: ${applied} applied, ${results.length} total`);
   } catch (err) {
     console.error('[SignLoop Server] Migration failed — starting anyway:', err);
+  }
+
+  // Auto-seed if DB is empty (fresh deploy on Render).
+  // Seed uses INSERT OR REPLACE — safe to re-run.
+  try {
+    const db = getDb();
+    const profileCount = (db.prepare('SELECT COUNT(*) as cnt FROM profiles').get() as { cnt: number }).cnt;
+    if (profileCount === 0) {
+      console.log('[SignLoop Server] Empty DB detected — running seed...');
+      seedDatabase({ silent: false });
+      console.log('[SignLoop Server] Seed complete.');
+    } else {
+      console.log(`[SignLoop Server] DB already has ${profileCount} profiles — skipping seed.`);
+    }
+  } catch (err) {
+    console.error('[SignLoop Server] Seed failed:', err);
   }
 
   server.listen(PORT, () => {

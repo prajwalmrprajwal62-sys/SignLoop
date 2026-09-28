@@ -1,7 +1,6 @@
-﻿// In dev: Vite proxies /api → localhost:3001. BASE_URL is empty so fetch('/api/...') works.
-// In production: VITE_API_URL is set to the Render backend URL (e.g. https://signloop-backend.onrender.com)
-declare const __API_URL__: string;
-const BASE_URL = typeof __API_URL__ !== 'undefined' ? __API_URL__ : '';
+// In dev: Vite proxies /api → localhost:3001. BASE_URL is empty so fetch('/api/...') works.
+// In production: VITE_API_URL is set in Render's env vars and read at runtime via import.meta.env
+const BASE_URL = (import.meta as any).env?.VITE_API_URL || '';
 
 // All API calls use relative /api paths — Vite proxies /api -> http://localhost:3001
 

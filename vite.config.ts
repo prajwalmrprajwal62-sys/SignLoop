@@ -41,9 +41,5 @@ export default defineConfig(({ mode }) => {
       sourcemap: false,   // disable in prod — no need to expose source
       target: 'es2022',
     },
-    define: {
-      // Make the backend URL available in the built bundle
-      __API_URL__: JSON.stringify(mode === 'production' ? (env.VITE_API_URL ?? '') : ''),
-    },
   };
 });
