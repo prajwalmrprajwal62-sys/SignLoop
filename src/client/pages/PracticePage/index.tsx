@@ -229,13 +229,22 @@ export function PracticePage() {
               )}
             </motion.div>
           ) : (
-            <GlassCard className="p-10 flex flex-col items-center text-center gap-4">
-              <Target size={44} className="text-slate-600" />
-              <div>
-                <p className="text-slate-300 font-semibold text-lg">No active practice tasks</p>
-                <p className="text-slate-500 text-sm mt-1">Your teacher will assign tasks to your profile. Use the tutor above to explore or ask questions.</p>
-              </div>
-            </GlassCard>
+            <>
+              {/* Gesture visual — shown above the empty state when a card is clicked */}
+              <GestureVisual
+                gestureKey={selectedGesture}
+                onClose={() => setSelectedGesture(null)}
+                emoji={selectedGesture ? (GESTURE_META[selectedGesture]?.emoji ?? '🤚') : ''}
+              />
+
+              <GlassCard className="p-10 flex flex-col items-center text-center gap-4">
+                <Target size={44} className="text-slate-600" />
+                <div>
+                  <p className="text-slate-300 font-semibold text-lg">No active practice tasks</p>
+                  <p className="text-slate-500 text-sm mt-1">Your teacher will assign tasks to your profile. Use the tutor above to explore or ask questions.</p>
+                </div>
+              </GlassCard>
+            </>
           )}
 
           {/* Other assigned tasks */}
@@ -280,13 +289,6 @@ export function PracticePage() {
             <Hand size={11} className="inline mr-1 text-violet-400" />
             Click any gesture to see the hand sign
           </p>
-
-          {/* Gesture visual panel — shown above the grid when a gesture is selected */}
-          <GestureVisual
-            gestureKey={selectedGesture}
-            onClose={() => setSelectedGesture(null)}
-            emoji={selectedGesture ? (GESTURE_META[selectedGesture]?.emoji ?? '🤚') : ''}
-          />
 
           <div className="grid grid-cols-2 gap-2">
             {Object.entries(GESTURE_META).map(([key, g]) => {
