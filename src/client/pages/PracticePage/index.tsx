@@ -5,8 +5,9 @@ import { GlassCard } from '../../components/common/GlassCard';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { useProfileStore } from '../../stores/profileStore';
 import { apiGet } from '../../api/client';
-import { Target, ChevronRight, MessageCircle } from 'lucide-react';
+import { Target, ChevronRight, MessageCircle, Hand } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { GestureVisual } from '../../components/practice/GestureVisual';
 
 interface PracticeTask {
   task_id: string;
@@ -56,6 +57,7 @@ export function PracticePage() {
   const [error, setError] = useState<string | null>(null);
   const [showTutor, setShowTutor] = useState(false);
   const [teacherMessages, setTeacherMessages] = useState<TeacherMessage[]>([]);
+  const [selectedGesture, setSelectedGesture] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeProfileId) return;
@@ -274,29 +276,51 @@ export function PracticePage() {
         {/* RIGHT — All 11 gestures reference panel in grid */}
         <div className="col-span-5 space-y-3">
           <SectionHeader>Sign Language Reference</SectionHeader>
-          <p className="text-slate-500 text-xs mb-2">All 11 gestures you can sign with the glove</p>
+          <p className="text-slate-500 text-xs mb-2">
+            <Hand size={11} className="inline mr-1 text-violet-400" />
+            Click any gesture to see the hand sign
+          </p>
+
+          {/* Gesture visual panel — shown above the grid when a gesture is selected */}
+          <GestureVisual
+            gestureKey={selectedGesture}
+            onClose={() => setSelectedGesture(null)}
+            emoji={selectedGesture ? (GESTURE_META[selectedGesture]?.emoji ?? '🤚') : ''}
+          />
+
           <div className="grid grid-cols-2 gap-2">
-            {Object.entries(GESTURE_META).map(([key, g]) => (
-              <div
-                key={key}
-                className="rounded-xl border p-2.5 flex items-start gap-2 transition-all hover:border-white/20 relative"
-                style={{
-                  background: `${g.color}09`,
-                  borderColor: `${g.color}30`,
-                }}
-              >
-                <span className="text-xl shrink-0">{g.emoji}</span>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <span className="font-bold text-white text-[11px] uppercase">{key}</span>
-                    {activeTask?.intent_id === key && (
-                      <span className="text-[8px] font-mono bg-violet-500/20 text-violet-300 px-1 py-0.5 rounded border border-violet-500/30">NOW</span>
-                    )}
+            {Object.entries(GESTURE_META).map(([key, g]) => {
+              const isSelected = selectedGesture === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setSelectedGesture(isSelected ? null : key)}
+                  className="rounded-xl border p-2.5 flex items-start gap-2 transition-all hover:border-white/25 relative text-left w-full"
+                  style={{
+                    background: isSelected ? `${g.color}18` : `${g.color}09`,
+                    borderColor: isSelected ? `${g.color}70` : `${g.color}30`,
+                    boxShadow: isSelected ? `0 0 14px ${g.color}22` : undefined,
+                  }}
+                >
+                  <span className="text-xl shrink-0">{g.emoji}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="font-bold text-white text-[11px] uppercase">{key}</span>
+                      {activeTask?.intent_id === key && (
+                        <span className="text-[8px] font-mono bg-violet-500/20 text-violet-300 px-1 py-0.5 rounded border border-violet-500/30">NOW</span>
+                      )}
+                      {isSelected && (
+                        <span className="text-[8px] font-mono px-1 py-0.5 rounded border"
+                          style={{ color: g.color, borderColor: `${g.color}50`, background: `${g.color}15` }}>
+                          SHOWING
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-slate-500 text-[10px] italic leading-tight mt-0.5 line-clamp-1">"{g.caption}"</p>
                   </div>
-                  <p className="text-slate-500 text-[10px] italic leading-tight mt-0.5 line-clamp-1">"{g.caption}"</p>
-                </div>
-              </div>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
