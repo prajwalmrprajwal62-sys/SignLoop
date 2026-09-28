@@ -1,13 +1,16 @@
 /**
  * GestureVisual — shows a real glove photo for each ISL sign.
- * 6 signs have real photos; remaining 5 fall back to SVG hand diagrams.
+ * All 11 signs have real photos in /public/gestures/.
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 
-// ── Which gestures have a real photo in /public/gestures/ ───────────────────
-const PHOTO_GESTURES = new Set(['HELP', 'WATER', 'FOOD', 'PAIN', 'DOCTOR', 'MEDICINE']);
+// All 11 gestures have real photos now
+const PHOTO_GESTURES = new Set([
+  'HELP', 'WATER', 'FOOD', 'PAIN', 'DOCTOR', 'MEDICINE',
+  'WASHROOM', 'YES', 'NO', 'REPEAT', 'THANK_YOU',
+]);
 
 // ── SVG fallback — for gestures without a real photo ────────────────────────
 interface FingerState {
